@@ -1,0 +1,97 @@
+@(loginForm:Form[(String, String)], errorMsg: Option[String] = None)(implicit request: RequestHeader, lang: Lang, env:securesocial.core.RuntimeEnvironment[_])
+
+@import securesocial.core.providers.UsernamePasswordProvider.UsernamePassword
+
+
+@meta = {
+
+}
+
+@scripts = {
+
+}
+
+
+
+@empty("surfkit.io", scripts, meta) {
+    <p><br/></p>
+    <div class="container">
+        <div class="row">
+            <h1>@Messages("securesocial.login.title")</h1>
+        </div>
+    </div>
+    @errorMsg.map { msg =>
+        <div class="container">
+            <div class="row">
+                <div class="alert alert-error">
+                    @Messages(msg)
+                </div>
+            </div>
+        </div>
+    }
+
+    @request.flash.get("success").map { msg =>
+        <div class="alert alert-info">
+            @msg
+        </div>
+    }
+
+    @request.flash.get("error").map { msg =>
+        <div class="alert alert-error">
+            @msg
+        </div>
+    }
+
+    @*
+    * This gets all the providers, including the ones we don't support yet. Just get the G1 providers for now
+    * @defining( env.providers.values.filter(_.id != UsernamePassword) ) { externalProviders =>
+    *@
+    @defining(env.providers.values.filter( p => p.id == "google" || p.id == "facebook" )) { externalProviders =>
+        @if( externalProviders.size > 0 ) {
+            <div class="container">
+                <div class="row provider-pack">
+                    <div class="panel panel-default">
+                        <div class="panel-heading">@Messages("securesocial.login.instructions")</div>
+                        <div class="panel-body">
+                            <p>Welcome to walkabout.  For our beta group you must login with one of the following providers:</p>
+                            @*
+                            @for(p <- externalProviders) {
+                            <div class="col-xs-3 col-sm-2 col-md-1 centered">
+                            @securesocial.views.html.provider(p.id)
+                            </div>
+                            }
+                            *@
+                            <div class="col-xs-12 col-sm-12 col-md-12 centered">
+                            @for(p <- externalProviders) {
+                                @securesocial.views.html.provider(p.id)
+                            }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @*********
+        * Let's comment this out for now...
+        @env.providers.get(UsernamePassword).map { up =>
+        <div class="container">
+        <div class="row centered">
+        <div class="panel panel-default" style="max-width: 400px; text-align: left;">
+
+        @if( externalProviders.size > 0 ) {
+        <div class="panel-heading">@Messages("securesocial.login.useEmailAndPassword")</div>
+        } else {
+        <div class="panel-heading">@Messages("securesocial.login.useEmailAndPasswordOnly")</div>
+        }
+        <div class="panel-body form-group">
+        @securesocial.views.html.provider("userpass", Some(loginForm))
+        </div>
+        </div>
+        </div>
+        </div>
+        }
+        **********@
+
+    }
+}

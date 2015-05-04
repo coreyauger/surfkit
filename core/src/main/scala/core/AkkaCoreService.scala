@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.math._
 import spray.json.DefaultJsonProtocol
 
-import im.surfkit.model._
+import io.surfkit.model._
 
 
 trait Protocols extends DefaultJsonProtocol {
@@ -60,7 +60,7 @@ trait Service extends Protocols {
       pathPrefix("test") {
         (get & path(Segment)) { test =>
           complete {
-            IpInfo("test",Some("country"),None,None,None)
+            IpInfo("test","city","country",0.0,0.0)
           }
         } ~
           (post & entity(as[IpPairSummaryRequest])) { ipPairSummaryRequest =>

@@ -7,15 +7,15 @@ import akka.http.testkit.ScalatestRouteTest
 import akka.stream.scaladsl.Flow
 import org.scalatest._
 
-import im.surfkit.model._
+import io.surfkit.model._
 
 class ServiceSpec extends FlatSpec with Matchers with ScalatestRouteTest with Service {
   override def testConfigSource = "akka.loglevel = WARNING"
   override def config = testConfig
   override val logger = NoLogging
 
-  val ip1Info = IpInfo("8.8.8.8", Option("United States"), Option("Mountain View"), Option(37.386), Option(-122.0838))
-  val ip2Info = IpInfo("8.8.4.4", Option("United States"), None, Option(38.0), Option(-97.0))
+  val ip1Info = IpInfo("8.8.8.8", "United States", "Mountain View", 37.386, -122.0838)
+  val ip2Info = IpInfo("8.8.4.4", "United States", "", 38.0, -97.0)
   val ipPairSummary = IpPairSummary(ip1Info, ip2Info)
 
   override lazy val coreConnectionFlow = Flow[HttpRequest].map { request =>

@@ -1,6 +1,31 @@
+import com.typesafe.sbt.less.Import.LessKeys
+
+import sbt.Keys._
+
+import org.scalajs.sbtplugin.ScalaJSPlugin
+
+import org.scalajs.sbtplugin.ScalaJSPlugin.AutoImport._
+
+import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+
+import sbt._
+
+import Keys._
+
+packageDescription in Debian := "surfkit.im"
+
+maintainer in Debian := "Corey Auger coreyauger@gmail.com"
+
 name := """surfkit"""
 
+
+
 version := "1.0-SNAPSHOT"
+
+resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+
+
+val surfkit = "surfkit"
 
 val scalajsOutputDir = Def.settingKey[File]("directory for javascript files output by scalajs")
 
@@ -48,7 +73,7 @@ lazy val commonSettings = Seq(
 
 
 lazy val clientSettings = commonSettings ++ Seq(
-  name := s"$name-client",
+  name := s"$surfkit-client",
   libraryDependencies ++= clientDeps.value
 ) ++ sharedDirSettings
 
@@ -64,7 +89,7 @@ lazy val clientDeps = Def.setting(Seq(
 ))
 
 lazy val webSettings = commonSettings ++ Seq(
-    name := s"$name-web",
+    name := s"$surfkit-web",
   scalajsOutputDir := (classDirectory in Compile).value / "public" / "javascripts",
   compile in Compile <<= (compile in Compile) dependsOn (fastOptJS in (client, Compile)) dependsOn copySourceMapsTask,
   dist <<= dist dependsOn (fullOptJS in (client, Compile)),
@@ -84,7 +109,9 @@ lazy val sharedDirSettings = Seq(
 )
 
 lazy val webDeps = Seq(
+    ws,
     "com.github.mauricio"         %% "postgresql-async"    % "0.2.15",
+    "ws.securesocial"             %% "securesocial"        % "3.0-M3",
     "org.scalatestplus"           %% "play"                % "1.2.0" % "test",
     "org.webjars"                 % "bootstrap"            % "3.3.4",
     "org.webjars"                 % "jquery"               % "2.1.4",
@@ -93,7 +120,7 @@ lazy val webDeps = Seq(
 
 
 lazy val coreSettings = commonSettings ++ Seq(
-  name := s"$name-core",
+  name := s"$surfkit-core",
   libraryDependencies ++= coreDeps
 )
 
@@ -103,6 +130,7 @@ lazy val coreDeps = {
   val akkaStreamV = "1.0-M5"
   val scalaTestV = "2.2.1"
   Seq(
+    ws,
     "com.typesafe.akka" %% "akka-actor" % akkaV,
     "com.typesafe.akka" %% "akka-stream-experimental" % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-core-experimental" % akkaStreamV,

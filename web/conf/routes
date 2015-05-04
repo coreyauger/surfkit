@@ -5,5 +5,12 @@
 # Home page
 GET     /                           controllers.Application.index
 
+GET     /ip/:ip                    controllers.Application.lookup(ip: String)
+
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file)
+
+GET         /custom/login                         @controllers.CustomLoginController.login
+GET         /custom/logout                        @controllers.CustomLoginController.logout
+
+->          /auth                                 securesocial.Routes
