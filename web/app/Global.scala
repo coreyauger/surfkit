@@ -50,7 +50,7 @@ object Global extends play.api.GlobalSettings {
   override def onStart(app: play.api.Application) {
     val startup =
       """
-           _________              _____ ____  __.__  __     .__
+        |  _________              _____ ____  __.__  __     .__
         | /   _____/__ __________/ ____\    |/ _|__|/  |_   |__| ____
         | \_____  \|  |  \_  __ \   __\|      < |  \   __\  |  |/  _ \
         | /        \  |  /|  | \/|  |  |    |  \|  ||  |    |  (  <_> )
