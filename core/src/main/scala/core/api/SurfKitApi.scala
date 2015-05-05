@@ -2,6 +2,9 @@ package io.surfkit.core.api
 
 
 import akka.http.server.directives.LogEntry
+import io.surfkit.core.Configuration
+import io.surfkit.core.rabbitmq.RabbitDispatcher
+import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import io.surfkit.core.service.v1.SurfKitService
 import io.surfkit.core.socket.SocketService
 import io.surfkit.core.websocket.WebSocketServer
@@ -25,6 +28,7 @@ trait SurfKitApi extends RouteConcatenation with StaticRoute with AbstractSystem
       new SurfKitService(v1).route ~
       staticRoute
   }
+
   val wsService = system.actorOf(Props(new RootService[WebSocketServer](wsroutes)), "wss")
   lazy val wsroutes = logRequest(showReq _) {
       new SurfKitService(v1).wsroute ~
@@ -50,16 +54,4 @@ trait StaticRoute extends Directives {
       pathEndOrSingleSlash {
         getFromResource("index.html")
       } ~ complete(StatusCodes.NotFound)
-}
-
-object Configuration {
-  import com.typesafe.config.ConfigFactory
-
-  private val config = ConfigFactory.load
-  config.checkValid(ConfigFactory.defaultReference)
-
-  lazy val host = config.getString("surfkit.host")
-  lazy val portHttp = config.getInt("surfkit.ports.http")
-  lazy val portTcp = config.getInt("surfkit.ports.tcp")
-  lazy val portWs = config.getInt("surfkit.ports.ws")
 }

@@ -1,7 +1,7 @@
 package io.surfkit.core.service.v1
 
 
-import io.surfkit.core.api.Configuration
+import io.surfkit.core.Configuration
 import io.surfkit.core.websocket.WebSocket
 import akka.actor.{ ActorRef, ActorSystem }
 import spray.http.StatusCodes

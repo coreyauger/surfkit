@@ -139,7 +139,7 @@ lazy val coreDeps = {
     "com.typesafe.akka" %% "akka-http-spray-json-experimental"  % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-testkit-experimental"     % akkaStreamV,
     "io.spray"          %%  "spray-can"                         % sprayV,
-    "io.spray"          %%  "spray-routing"                     % sprayV,
+    "io.spray"          %%  "spray-routing-shapeless2"          % sprayV,
     "com.rabbitmq"       %  "amqp-client"                       % "3.3.5",
     "com.wandoulabs.akka" %%  "spray-websocket"                 % "0.1.4",
     "com.typesafe.play" %% "play-json"                          % "2.3.4",

@@ -1,6 +1,10 @@
 package io.surfkit.core.service.v1
 
 import akka.actor.{ Actor, ActorLogging }
+import akka.actor.Props
+import io.surfkit.core.Configuration
+import io.surfkit.core.rabbitmq.RabbitDispatcher
+import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import scala.collection.mutable
 import io.surfkit.core.websocket._
 
@@ -14,6 +18,13 @@ object RabbitMqActor {
 }
 
 class RabbitMqActor extends Actor with ActorLogging {
+
+  log.info("Created RabbitMqActor.  Trying to connect to rabbitmq...")
+
+  val rabbitDispatcher = context.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
+  rabbitDispatcher ! RabbitDispatcher.Connect  // connect to the MQ
+
+
   val clients = mutable.ListBuffer[WebSocket]()
   val markers = mutable.Map[RabbitMqActor.Marker, Option[RabbitMqActor.Move]]()
   override def receive = {
