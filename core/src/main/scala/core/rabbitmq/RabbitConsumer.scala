@@ -1,4 +1,4 @@
-package core.rabbitmq
+package io.surfkit.core.rabbitmq
 
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
@@ -23,7 +23,7 @@ object RabbitConsumer {
 
 class RabbitConsumer(userId: String, userActor: ActorRef)(implicit connection: Connection) extends Actor with ActorLogging {
   
-  import core.rabbitmq.RabbitConsumer._
+  import io.surfkit.core.rabbitmq.RabbitConsumer._
   
   val queue = s"${RabbitConfig.userExchange}.$userId"
   
@@ -51,7 +51,7 @@ class RabbitConsumer(userId: String, userActor: ActorRef)(implicit connection: C
   
       
   override def receive = {
-    case msg: RabbitMessage => 
+    case msg: RabbitConsumer.RabbitMessage =>
       log.debug(s"received msg with deliveryTag ${msg.deliveryTag}")
       userActor ! msg
   }

@@ -1,10 +1,10 @@
-package core.rabbitmq
+package io.surfkit.core.rabbitmq
 
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
 
 import akka.actor._
-import core.rabbitmq.RabbitDispatcher._
+import io.surfkit.core.rabbitmq.RabbitDispatcher._
 
 import play.api.libs.json.JsValue
 
@@ -17,6 +17,7 @@ import scala.annotation.tailrec
 object RabbitConfig {
   
   val userExchange = "surfkit.users"
+  val sysExchange = "surfkit.sys"
   
 }
 
@@ -24,8 +25,13 @@ object RabbitDispatcher {
 
   case object Connect
   case object GetConnection
-  case class Send(receiverUuid: String, provider: String, json: JsValue)
-  
+
+  case class RabbitMqAddress(host:String, port:Int)
+
+  sealed trait RabbitSend
+  case class SendUser(receiverUuid: String, provider: String, json: JsValue) extends RabbitSend
+  case class SendSys(appId: String, json: JsValue) extends  RabbitSend
+
   sealed trait State
   case object Connected extends State
   case object Disconnected extends State
@@ -34,22 +40,22 @@ object RabbitDispatcher {
   case object NoBrokerConnection extends Data
   case class BrokerConnection(underlying: com.rabbitmq.client.Connection, publisher: ActorRef) extends Data
   
-  def props(address: RabbitAddress) = Props(new RabbitDispatcher(address))
+  def props(address: RabbitMqAddress) = Props(new RabbitDispatcher(address))
 }
 
-class RabbitDispatcher(address: RabbitAddress) extends Actor with FSM[State, Data] with ActorLogging {
+class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, Data] with ActorLogging {
   
   val reconnectIn = 10 seconds
   
   val factory = {
     val cf = new ConnectionFactory()
-    cf.setHost(address.getHost())
-    cf.setPort(address.getPort())
+    cf.setHost(address.host)
+    cf.setPort(address.port)
     cf.setAutomaticRecoveryEnabled(true)
     cf
   }
   
-  var msgBuffer: Queue[Send] = Queue.empty
+  var msgBuffer: Queue[RabbitSend] = Queue.empty
   
   val shutdownListener = new ShutdownListener {
     override def shutdownCompleted(cause: ShutdownSignalException) {
@@ -74,14 +80,17 @@ class RabbitDispatcher(address: RabbitAddress) extends Actor with FSM[State, Dat
           setTimer("RabbitMQ reconnection", RabbitDispatcher.Connect, reconnectIn, false)
           stay
       }
-    case Event(msg: Send, _) =>
+    case Event(msg: RabbitSend, _) =>
       msgBuffer = msgBuffer.enqueue(msg)
       stay
   }
   
   when(Connected) {
-    case Event(Send(uuid, provider, msg), BrokerConnection(_, publisher)) =>
-      publisher ! RabbitPublisher.RabbitMessage(uuid, provider, msg)
+    case Event(SendUser(uuid, provider, msg), BrokerConnection(_, publisher)) =>
+      publisher ! RabbitPublisher.RabbitUserMessage(uuid, provider, msg)
+      stay
+    case Event(SendSys(appId, msg), BrokerConnection(_, publisher)) =>
+      publisher ! RabbitPublisher.RabbitSystemMessage(appId, msg)
       stay
     case Event(GetConnection, BrokerConnection(conn, _)) =>
       sender() ! conn
@@ -102,10 +111,13 @@ class RabbitDispatcher(address: RabbitAddress) extends Actor with FSM[State, Dat
   }
   
   @tailrec
-  private[this] def send(buffer: Queue[Send], publisher: ActorRef): Queue[Send] =
+  private[this] def send(buffer: Queue[RabbitSend], publisher: ActorRef): Queue[RabbitSend] =
     buffer.dequeueOption match {
-      case Some((Send(uuid, provider, msg), buff)) =>
-        publisher ! RabbitPublisher.RabbitMessage(uuid, provider, msg)
+      case Some((SendUser(uuid, provider, msg), buff)) =>
+        publisher ! RabbitPublisher.RabbitUserMessage(uuid, provider, msg)
+        send(buff, publisher)
+      case Some((SendSys(appId, msg), buff)) =>
+        publisher ! RabbitPublisher.RabbitSystemMessage(appId, msg)
         send(buff, publisher)
       case None => buffer
     }

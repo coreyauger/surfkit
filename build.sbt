@@ -127,6 +127,7 @@ lazy val coreSettings = commonSettings ++ Seq(
 
 lazy val coreDeps = {
   val akkaV = "2.3.9"
+  val sprayV = "1.3.3"
   val akkaStreamV = "1.0-M5"
   val scalaTestV = "2.2.1"
   Seq(
@@ -137,7 +138,10 @@ lazy val coreDeps = {
     "com.typesafe.akka" %% "akka-http-experimental"             % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-spray-json-experimental"  % akkaStreamV,
     "com.typesafe.akka" %% "akka-http-testkit-experimental"     % akkaStreamV,
+    "io.spray"          %%  "spray-can"                         % sprayV,
+    "io.spray"          %%  "spray-routing"                     % sprayV,
     "com.rabbitmq"       %  "amqp-client"                       % "3.3.5",
+    "com.wandoulabs.akka" %%  "spray-websocket"                 % "0.1.4",
     "com.typesafe.play" %% "play-json"                          % "2.3.4",
     "org.scalatest"     %% "scalatest"                          % scalaTestV % "test"
   )

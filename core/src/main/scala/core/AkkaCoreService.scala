@@ -1,5 +1,3 @@
-import java.net.Socket
-
 import akka.actor.ActorSystem
 import akka.event.{LoggingAdapter, Logging}
 import akka.http.Http
@@ -15,13 +13,21 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory
 import java.io.IOException
-import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.math._
-import spray.json.DefaultJsonProtocol
+import io.surfkit.core.api.{MainActors, SurfKitApi}
+import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
+import play.api.libs.concurrent.Akka
 
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import spray.json.DefaultJsonProtocol
+import akka.io.{ IO, Tcp }
+import java.net.InetSocketAddress
+import spray.can.Http
+import spray.can.server.UHttp
+
+import io.surfkit.core.rabbitmq._
 import io.surfkit.model._
 
-
+/*
 trait Protocols extends DefaultJsonProtocol {
   implicit val ipInfoFormat = jsonFormat5(IpInfo.apply)
   implicit val ipPairSummaryRequestFormat = jsonFormat2(IpPairSummaryRequest.apply)
@@ -57,24 +63,7 @@ trait Service extends Protocols {
 
   val routes = {
     logRequestResult("akka-core-service") {
-      pathPrefix("test") {
-        (get & path(Segment)) { test =>
-          complete {
-            IpInfo("test","city","country",0.0,0.0)
-          }
-        } ~
-          (post & entity(as[IpPairSummaryRequest])) { ipPairSummaryRequest =>
-            complete {
-              val ip1InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip1)
-              val ip2InfoFuture = fetchIpInfo(ipPairSummaryRequest.ip2)
-              ip1InfoFuture.zip(ip2InfoFuture).map[ToResponseMarshallable] {
-                case (Right(info1), Right(info2)) => IpPairSummary(info1, info2)
-                case (Left(errorMessage), _) => BadRequest -> errorMessage
-                case (_, Left(errorMessage)) => BadRequest -> errorMessage
-              }
-            }
-          }
-      }
+      (get & path("test")) { complete(OK -> "Lots of whatever") }
 
 
       pathPrefix("ip") {
@@ -101,14 +90,33 @@ trait Service extends Protocols {
     }
   }
 }
+*/
 
-object AkkaCoreService extends App with Service {
-  override implicit val system = ActorSystem()
+object AkkaCoreService extends App with MainActors with SurfKitApi {
+  override implicit val system = ActorSystem("surfkit")
+  val config = ConfigFactory.load()
+  val logger = Logging(system, getClass)
+  /*
+
   override implicit val executor = system.dispatcher
   override implicit val materializer = ActorFlowMaterializer()
 
-  override val config = ConfigFactory.load()
-  override val logger = Logging(system, getClass)
 
-  Http().bindAndHandle(routes, config.getString("http.interface"), config.getInt("http.port"))
+  override val logger = Logging(system, getClass)
+  */
+
+  val conf = ConfigFactory.load()
+
+  //RabbitMQ init
+  val rabbitHost = conf.getString("rabbitmq.host")
+  val rabbitPort = conf.getInt("rabbitmq.port")
+
+  //val rabbitDispatcher = Akka.system.actorOf(RabbitDispatcher.props(new RabbitAddress(rabbitHost, rabbitPort)))
+  //rabbitDispatcher ! RabbitDispatcher.Connect
+
+  val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(rabbitHost, rabbitPort)))
+  rabbitDispatcher ! RabbitDispatcher.Connect  // connect to the MQ
+
+  //Http().bindAndHandle(routes, config.getString("http.interface"), config.getInt("http.port"))
+
 }
