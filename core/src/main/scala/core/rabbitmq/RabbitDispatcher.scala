@@ -1,5 +1,7 @@
 package io.surfkit.core.rabbitmq
 
+import akka.util.ByteString
+
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
 
@@ -30,7 +32,7 @@ object RabbitDispatcher {
 
   sealed trait RabbitSend
   case class SendUser(receiverUuid: String, provider: String, json: JsValue) extends RabbitSend
-  case class SendSys(appId: String, json: JsValue) extends  RabbitSend
+  case class SendSys(appId: String, corrId:String, json: JsValue) extends  RabbitSend
 
   sealed trait State
   case object Connected extends State
@@ -72,7 +74,10 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
       Try { factory.newConnection() } match {
         case Success(conn) =>
           conn.addShutdownListener(shutdownListener)
-          val publisher = context.actorOf(RabbitPublisher.props(conn.createChannel()))
+          val channel = conn.createChannel()
+          val replyQueueName = channel.queueDeclare().getQueue()
+          val publisher = context.actorOf(RabbitPublisher.props(channel, replyQueueName))
+          val consumer = context.actorOf(RabbitSysConsumer.props(channel, replyQueueName))
           goto(Connected) using BrokerConnection(conn, publisher)
         case Failure(f) =>
           log.error(f, s"Couldn't connect to RabbitMQ server at $address")
@@ -89,13 +94,15 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
     case Event(SendUser(uuid, provider, msg), BrokerConnection(_, publisher)) =>
       publisher ! RabbitPublisher.RabbitUserMessage(uuid, provider, msg)
       stay
-    case Event(SendSys(appId, msg), BrokerConnection(_, publisher)) =>
-      publisher ! RabbitPublisher.RabbitSystemMessage(appId, msg)
+    case Event(SendSys(appId, corrId, msg), BrokerConnection(_, publisher)) =>
+      publisher ! RabbitPublisher.RabbitSystemMessage(appId, corrId, msg)
       stay
     case Event(GetConnection, BrokerConnection(conn, _)) =>
       sender() ! conn
       stay
-      
+    case Event(msg @ RabbitSysConsumer.RabbitMessage(deliveryTag, correlationId, headers, body), BrokerConnection(conn, _)) =>
+      context.parent.forward(msg)
+      stay
   }
   
   onTransition {
@@ -116,8 +123,8 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
       case Some((SendUser(uuid, provider, msg), buff)) =>
         publisher ! RabbitPublisher.RabbitUserMessage(uuid, provider, msg)
         send(buff, publisher)
-      case Some((SendSys(appId, msg), buff)) =>
-        publisher ! RabbitPublisher.RabbitSystemMessage(appId, msg)
+      case Some((SendSys(appId, corrId:String, msg), buff)) =>
+        publisher ! RabbitPublisher.RabbitSystemMessage(appId, corrId, msg)
         send(buff, publisher)
       case None => buffer
     }

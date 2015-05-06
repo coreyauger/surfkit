@@ -18,8 +18,6 @@ maintainer in Debian := "Corey Auger coreyauger@gmail.com"
 
 name := """surfkit"""
 
-
-
 version := "1.0-SNAPSHOT"
 
 resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
@@ -47,6 +45,7 @@ lazy val root =
   .settings(commonSettings:_*)
   .aggregate(core)
   .aggregate(web)
+    .aggregate(hangten)
 
 lazy val web =
   (project in file("web"))
@@ -64,6 +63,12 @@ lazy val client =
   .settings(clientSettings:_*)
   .enablePlugins(ScalaJSPlugin)
 
+// Default modules ...
+lazy val hangten =
+  (project in file("modules/hangten"))
+    .settings(moduleSettings:_*)
+    .dependsOn(core)
+
 lazy val commonSettings = Seq(
     organization := "im.surfkit",
     version := "1.0-SNAPSHOT",
@@ -71,6 +76,10 @@ lazy val commonSettings = Seq(
     scalaVersion := "2.11.6"
   )
 
+
+lazy val moduleSettings = Seq(
+  scalaVersion := "2.11.6"
+)
 
 lazy val clientSettings = commonSettings ++ Seq(
   name := s"$surfkit-client",
@@ -148,3 +157,14 @@ lazy val coreDeps = {
 }
 
 
+
+
+
+// debug
+val exportFullResolvers = taskKey[Unit]("debug resolvers")
+
+exportFullResolvers := {
+  for {
+    (resolver,idx) <- fullResolvers.value.zipWithIndex
+  } println(s"${idx}.  ${resolver.name}")
+}

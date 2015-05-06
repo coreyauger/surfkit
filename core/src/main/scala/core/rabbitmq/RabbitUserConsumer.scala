@@ -10,20 +10,20 @@ import com.rabbitmq.client.DefaultConsumer
 import com.rabbitmq.client.Envelope
 import com.rabbitmq.client.AMQP
 
-object RabbitConsumer {
+object RabbitUserConsumer {
 
   lazy val userExchange = RabbitConfig.userExchange
   
   case class RabbitMessage(deliveryTag: Long, headers: Map[String, String], body: ByteString)
   
   def props(userId: String, userActor: ActorRef)(implicit connection: Connection) = 
-    Props(new RabbitConsumer(userId, userActor))
+    Props(new RabbitUserConsumer(userId, userActor))
 }
 
 
-class RabbitConsumer(userId: String, userActor: ActorRef)(implicit connection: Connection) extends Actor with ActorLogging {
+class RabbitUserConsumer(userId: String, userActor: ActorRef)(implicit connection: Connection) extends Actor with ActorLogging {
   
-  import io.surfkit.core.rabbitmq.RabbitConsumer._
+  import io.surfkit.core.rabbitmq.RabbitUserConsumer._
   
   val queue = s"${RabbitConfig.userExchange}.$userId"
   
@@ -51,7 +51,7 @@ class RabbitConsumer(userId: String, userActor: ActorRef)(implicit connection: C
   
       
   override def receive = {
-    case msg: RabbitConsumer.RabbitMessage =>
+    case msg: RabbitUserConsumer.RabbitMessage =>
       log.debug(s"received msg with deliveryTag ${msg.deliveryTag}")
       userActor ! msg
   }

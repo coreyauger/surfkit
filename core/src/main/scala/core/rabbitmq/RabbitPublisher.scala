@@ -2,7 +2,7 @@ package io.surfkit.core.rabbitmq
 
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, Props}
-import com.rabbitmq.client.{AMQP, Channel}
+import com.rabbitmq.client.{QueueingConsumer, AMQP, Channel}
 import play.api.libs.json._
 
 sealed trait RabbitMessage
@@ -10,18 +10,19 @@ sealed trait RabbitMessage
 object RabbitPublisher {
   
   case class RabbitUserMessage(receiverUuid: String, provider: String, msg: JsValue) extends RabbitMessage
-  case class RabbitSystemMessage(appId:String, msg: JsValue) extends RabbitMessage
+  case class RabbitSystemMessage(appId:String, corrId: String, msg: JsValue) extends RabbitMessage
 
-  def props(channel: Channel): Props = Props(new RabbitPublisher(channel))
+  def props(channel: Channel, replyQueueName: String): Props = Props(new RabbitPublisher(channel, replyQueueName))
 }
 
-class RabbitPublisher(channel: Channel) extends Actor with ActorLogging {
+class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor with ActorLogging {
 
   import io.surfkit.core.rabbitmq.RabbitPublisher._
   
   channel.exchangeDeclare(RabbitConfig.userExchange, "direct", true)
   channel.exchangeDeclare(RabbitConfig.sysExchange, "direct", true)
-  
+
+
   override def receive = {
     case RabbitUserMessage(userId, provider, msg) =>
       val routingKey = s"${RabbitConfig.userExchange}.$userId"
@@ -34,14 +35,24 @@ class RabbitPublisher(channel: Channel) extends Actor with ActorLogging {
         msg.toString().getBytes()
       )
 
-    case RabbitSystemMessage(appId, msg) =>
+    case RabbitSystemMessage(appId, corrId, msg) =>
       val routingKey = s"${RabbitConfig.sysExchange}.$appId"
       val headers = Map("aid" -> appId)
-      log.debug(s"RabbitUserMessage($appId, $msg)")
+
+
+
+      val props = new AMQP.BasicProperties
+      .Builder()
+        .correlationId(corrId)
+        .replyTo(replyQueueName)
+        .build()
+
+      log.debug(s"RabbitSystemMessage($appId, $msg) corrId: $corrId  reply -> $replyQueueName")
       channel.basicPublish(
         RabbitConfig.sysExchange,
         routingKey,
-        new AMQP.BasicProperties.Builder().headers(headers).build(),
+        //new AMQP.BasicProperties.Builder().headers(headers).build(),
+        props,
         msg.toString().getBytes()
       )
   }

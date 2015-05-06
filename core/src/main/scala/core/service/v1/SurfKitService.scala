@@ -4,12 +4,14 @@ package io.surfkit.core.service.v1
 import io.surfkit.core.Configuration
 import io.surfkit.core.websocket.WebSocket
 import akka.actor.{ ActorRef, ActorSystem }
+import spray.can.Http
 import spray.http.StatusCodes
 import spray.routing.Directives
 
 class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Directives {
   lazy val route =
     pathPrefix("v1") {
+      println("here............................")
       val dir = "v1/"
       pathEndOrSingleSlash {
         getFromResource(dir + "index.html")
@@ -20,6 +22,18 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
             system.log.debug("redirect {} to {}", uri, wsUri)
             redirect(wsUri, StatusCodes.PermanentRedirect)
           }
+        } ~
+        pathPrefix("api"){
+          post{
+            implicit ctx =>
+            println("********************************")
+            v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,"")
+          } ~
+            get{
+              implicit ctx =>
+                println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$4")
+                v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,"")
+            }
         } ~
         getFromResourceDirectory(dir)
     }

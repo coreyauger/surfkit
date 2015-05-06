@@ -4,7 +4,11 @@ package service
  * Created by suroot on 04/05/15.
  */
 
-import play.api.Logger
+import play.api.Play.current
+import scala.concurrent.ExecutionContext.Implicits.global
+import play.api.libs.json.Json
+import play.api.{Play, Logger}
+import play.api.libs.ws.WS
 import securesocial.core._
 import securesocial.core.providers.{ UsernamePasswordProvider, MailToken }
 import scala.concurrent.Future
@@ -45,43 +49,60 @@ object ProfileImplicits {
   implicit def ProviderProfile2BasicProfile(u : Option[ProviderProfile]):Option[BasicProfile] =
     u.map( p => ProviderProfile2BasicProfile(p) )
 
-
   implicit def PasswordInfo2SkPassworInfo(p: PasswordInfo): io.surfkit.model.PasswordInfo =
-    PasswordInfo(p.hasher, p.password, p.salt)
+    io.surfkit.model.PasswordInfo(p.hasher, p.password, p.salt)
 
   implicit def SkPassworInfo2PasswordInfo(p: io.surfkit.model.PasswordInfo):PasswordInfo  =
     PasswordInfo(p.hasher, p.password, p.salt)
+
+  // CA - this is required....
+  import io.surfkit.model._
+
+
+  implicit val pir    = Json.reads[io.surfkit.model.PasswordInfo]
+  implicit val piw    = Json.writes[io.surfkit.model.PasswordInfo]
+
+  implicit val oa1r    = Json.reads[io.surfkit.model.OAuth1Info]
+  implicit val oa1w    = Json.writes[io.surfkit.model.OAuth1Info]
+
+  implicit val oa2r    = Json.reads[io.surfkit.model.OAuth2Info]
+  implicit val oa2w    = Json.writes[io.surfkit.model.OAuth2Info]
+
+  implicit val amr    = Json.reads[io.surfkit.model.AuthenticationMethod]
+  implicit val amw    = Json.writes[io.surfkit.model.AuthenticationMethod]
+
+  implicit val pr     = Json.reads[io.surfkit.model.ProviderProfile]
+  implicit val pw     = Json.writes[io.surfkit.model.ProviderProfile]
+  //implicit val ur     = Json.reads[io.surfkit.model.User]
+
 }
 
 
-
-/**
- * A Sample In Memory user service in Scala
- *
- * IMPORTANT: This is just a sample and not suitable for a production environment since
- * it stores everything in memory.
- */
 class SurfKitUserService extends UserService[User] {
   val logger = Logger("application.controllers.SurfKitUserService")
 
-  //
+  lazy val surfkitEndpoint = s"http://${Play.current.configuration.getString("surfkit.core.host").getOrElse("localhost")}:${Play.current.configuration.getString("surfkit.core.port").getOrElse(8080)}/v1/api"
+
   var users = Map[(String, String), User]()
   //private var identities = Map[String, BasicProfile]()
   private var tokens = Map[String, MailToken]()
 
   def find(providerId: String, userId: String): Future[Option[BasicProfile]] = {
     import ProfileImplicits._
+    logger.info(s"SurfKitUserService.find($providerId, $userId)")
     if (logger.isDebugEnabled) {
       logger.debug("users = %s".format(users))
     }
-    val result = for (
-      user <- users.values;
-      basicProfile <- user.identities.find(su => su.providerId == providerId && su.userId == userId)
-    ) yield {
-      basicProfile
+    // TODO: use akka HTTP stream here...
+    println("Calling core service ....")
+    println(s"$surfkitEndpoint/auth/find/$providerId/$userId")
+
+    WS.url(s"$surfkitEndpoint/auth/find/$providerId/$userId").get().map{
+      res =>
+        res.json.asOpt[ProviderProfile]
     }
-    Future.successful(result.headOption)
   }
+
 
   def findByEmailAndProvider(email: String, providerId: String): Future[Option[BasicProfile]] = {
     import ProfileImplicits._
@@ -98,33 +119,42 @@ class SurfKitUserService extends UserService[User] {
     Future.successful(result.headOption)
   }
 
-  private def findProfile(p: BasicProfile) = {
-    users.find {
-      case (key, value) if value.identities.exists(su => su.providerId == p.providerId && su.userId == p.userId) => true
-      case _ => false
-    }
-  }
 
   def save(user: BasicProfile, mode: SaveMode): Future[User] = {
+    println("SurfKitUserService.save")
     val convert = ProfileImplicits.BasicProfile2ProviderProfile(user)
     mode match {
       case SaveMode.SignUp =>
         val newUser = User(convert, List(convert))
-        users = users + ((user.providerId, user.userId) -> newUser)
-        Future.successful(newUser)
+        import ProfileImplicits._
+        println("... calling save.")
+        WS.url(s"$surfkitEndpoint/auth/save/${user.providerId}/${user.userId}").post(Json.toJson(convert)).map{
+          res =>
+            // TODO : how do we know if we failed here?
+            println(res)
+            newUser
+        }
       case SaveMode.LoggedIn =>
         // first see if there is a user with this BasicProfile already.
-        findProfile(user) match {
+        for{
+          fu <- find(user.providerId, user.userId)
+        }yield fu match{
           case Some(existingUser) =>
             // TODO: ..
+            println("existingUser ... do update")
             //updateProfile(user, existingUser)
             val newUser = User(convert, List(convert))
-            Future.successful(newUser)
+            newUser
 
           case None =>
-            val newUser = User(convert, List(convert))
-            users = users + ((user.providerId, user.userId) -> newUser)
-            Future.successful(newUser)
+            println("None ... calling save.")
+            import ProfileImplicits._
+            WS.url(s"$surfkitEndpoint/auth/save/${user.providerId}/${user.userId}").post(Json.toJson(convert)).map{
+              res =>
+                // TODO : how do we know if we failed here?
+                println(res)
+            }
+            User(convert, List(convert))
         }
 
       case SaveMode.PasswordChange =>

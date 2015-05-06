@@ -13,7 +13,7 @@ import upickle._
 
 object HelloReact extends JSApp{
 
-  case class State(ipInfos : Seq[IpInfo])
+  case class State(ipInfos : Seq[ProviderProfile])
 
   class Backend
 
@@ -21,9 +21,9 @@ object HelloReact extends JSApp{
     .initialState(State(List()))
     .backend(_ => new Backend)
     .render((_,s,_) => {
-    def createIpInfo(info: IpInfo) = div(
-      h3(s"${info.ip}"),
-      p(s"Trainer ${info.country} -- ${info.city} days")
+    def createIpInfo(info: ProviderProfile) = div(
+      h3(s"${info.providerId}"),
+      p(s"Trainer ${info.fullName} -- ${info.userId} days")
     )
 
     div(
@@ -32,10 +32,10 @@ object HelloReact extends JSApp{
     )
   }).componentDidMount(scope => {
     val url = "/ip/8.8.8.8"
-    Ajax.get(url).foreach { xhr => io.surfkit.model.IpInfo
+    Ajax.get(url).foreach { xhr => io.surfkit.model.ProviderProfile
       println(xhr.responseText)
      // val seminars = upickle.read[Seq[Seminar]](xhr.responseText)
-      val info = upickle.read[IpInfo](xhr.responseText)
+      val info = upickle.read[ProviderProfile](xhr.responseText)
       println(info)
       scope.setState(State(Seq(info)))
     }
