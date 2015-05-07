@@ -1,8 +1,12 @@
 package io.surfkit.model
 
 
+sealed trait Api
 sealed trait Model
 
+
+case class ApiRoute(id: String, reply:String, tag:Long) extends Api
+case class ApiRequest(module:String, op: String, routing:ApiRoute,  data: String) extends Api
 
 case class User(main: ProviderProfile, identities: List[ProviderProfile]) extends  Model
 /**

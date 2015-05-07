@@ -22,7 +22,6 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
   channel.exchangeDeclare(RabbitConfig.userExchange, "direct", true)
   channel.exchangeDeclare(RabbitConfig.sysExchange, "direct", true)
 
-
   override def receive = {
     case RabbitUserMessage(userId, provider, msg) =>
       val routingKey = s"${RabbitConfig.userExchange}.$userId"
@@ -36,7 +35,7 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
       )
 
     case RabbitSystemMessage(appId, corrId, msg) =>
-      val routingKey = s"${RabbitConfig.sysExchange}.$appId"
+      //val routingKey = s"${RabbitConfig.sysExchange}.$appId"
       val headers = Map("aid" -> appId)
 
 
@@ -50,7 +49,7 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
       log.debug(s"RabbitSystemMessage($appId, $msg) corrId: $corrId  reply -> $replyQueueName")
       channel.basicPublish(
         RabbitConfig.sysExchange,
-        routingKey,
+        RabbitConfig.sysExchange,  // no routing key
         //new AMQP.BasicProperties.Builder().headers(headers).build(),
         props,
         msg.toString().getBytes()

@@ -1,15 +1,10 @@
 package io.surfkit.modules
 
-import java.net.InetSocketAddress
-
 import akka.actor.{PoisonPill, ActorSystem}
 import akka.event.{LoggingAdapter, Logging}
-import akka.io.{Tcp, IO}
-//import akka.stream.{ActorFlowMaterializer, FlowMaterializer}
-//import akka.stream.scaladsl.{Flow, Sink, Source}
-import io.surfkit.core.api.{MainActors, SurfKitApi}
-import spray.can.server.UHttp
-import spray.can.Http
+import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
+import io.surfkit.core.rabbitmq.{RabbitDispatcher, RabbitModuleConsumer}
+
 
 object HangTenUserService extends App {
   implicit lazy val system = ActorSystem("hangten")
@@ -17,6 +12,8 @@ object HangTenUserService extends App {
 
   val logger = Logging(system, getClass)
 
+  val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
+  rabbitDispatcher ! RabbitDispatcher.ConnectModule  // connect to the MQ
 }
 
 

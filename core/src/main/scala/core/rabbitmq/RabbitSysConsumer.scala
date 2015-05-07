@@ -12,7 +12,7 @@ object RabbitSysConsumer {
 
   case class RabbitMessage(deliveryTag: Long, correlationId:String, headers: Map[String, String], body: ByteString)
 
-  def props(channel: Channel, replyQueueName: String) =
+  def props(channel: Channel, replyQueueName:String ) =
     Props(new RabbitSysConsumer(channel, replyQueueName))
 }
 

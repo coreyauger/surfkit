@@ -26,6 +26,7 @@ object RabbitConfig {
 object RabbitDispatcher {
 
   case object Connect
+  case object ConnectModule
   case object GetConnection
 
   case class RabbitMqAddress(host:String, port:Int)
@@ -79,6 +80,20 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
           val publisher = context.actorOf(RabbitPublisher.props(channel, replyQueueName))
           val consumer = context.actorOf(RabbitSysConsumer.props(channel, replyQueueName))
           goto(Connected) using BrokerConnection(conn, publisher)
+        case Failure(f) =>
+          log.error(f, s"Couldn't connect to RabbitMQ server at $address")
+          log.info(s"Reconnecting in $reconnectIn")
+          setTimer("RabbitMQ reconnection", RabbitDispatcher.Connect, reconnectIn, false)
+          stay
+      }
+    case Event(RabbitDispatcher.ConnectModule, _) =>
+      log.info("Connecting to RabbitMQ...")
+      Try { factory.newConnection() } match {
+        case Success(conn) =>
+          conn.addShutdownListener(shutdownListener)
+          val channel = conn.createChannel()
+          val consumer = context.actorOf(RabbitModuleConsumer.props(channel))
+          goto(Connected) using BrokerConnection(conn, consumer)
         case Failure(f) =>
           log.error(f, s"Couldn't connect to RabbitMQ server at $address")
           log.info(s"Reconnecting in $reconnectIn")
