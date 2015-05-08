@@ -10,8 +10,6 @@ import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 
 import sbt._
 
-import Keys._
-
 packageDescription in Debian := "surfkit.im"
 
 maintainer in Debian := "Corey Auger coreyauger@gmail.com"
@@ -78,7 +76,8 @@ lazy val commonSettings = Seq(
 
 
 lazy val moduleSettings = Seq(
-  scalaVersion := "2.11.6"
+  scalaVersion := "2.11.6",
+  libraryDependencies ++= hangTenDeps
 )
 
 lazy val clientSettings = commonSettings ++ Seq(
@@ -115,6 +114,12 @@ lazy val webSettings = commonSettings ++ Seq(
 lazy val sharedDirSettings = Seq(
   unmanagedSourceDirectories in Compile +=
     baseDirectory.value / "shared" / "main" / "scala"
+)
+
+lazy val hangTenDeps = Seq(
+  "com.typesafe.slick"            %% "slick"            % "3.0.0",
+  //"org.slf4j"                     % "slf4j-nop"         % "1.6.4",
+  "postgresql"                    % "postgresql"        % "9.1-901.jdbc4"
 )
 
 lazy val webDeps = Seq(
