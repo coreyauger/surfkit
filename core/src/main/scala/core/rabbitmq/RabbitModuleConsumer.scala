@@ -3,6 +3,8 @@ package io.surfkit.core.rabbitmq
 import akka.stream.actor.ActorPublisher
 import akka.stream.scaladsl.{Source, Sink, Flow}
 import akka.stream.ActorFlowMaterializer
+import core.api.modules.SurfKitModule.{ApiRoute, ApiResult, ApiRequest}
+import play.api.libs.json.{Format, Json}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
@@ -11,24 +13,26 @@ import akka.util.ByteString
 
 import com.rabbitmq.client._
 
+import scala.concurrent.Future
+
 object RabbitModuleConsumer {
 
   lazy val sysExchange = RabbitConfig.sysExchange
 
 
-  def props(channel: Channel) =
-    Props(new RabbitModuleConsumer(channel))
+  def props(channel: Channel, mapper: (ApiRequest) => Future[ApiResult]) =
+    Props(new RabbitModuleConsumer(channel, mapper))
 }
 
 
-class RabbitModuleConsumer(val channel: Channel) extends ActorPublisher[io.surfkit.model.ApiRequest] with ActorLogging {
+class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Future[ApiResult]) extends ActorPublisher[ApiRequest] with ActorLogging {
   import akka.stream.actor.ActorPublisherMessage._
   import io.surfkit.core.rabbitmq.RabbitModuleConsumer._
 
   implicit val materializer = ActorFlowMaterializer()
 
   val MaxBufferSize = 100
-  var buf = Vector.empty[io.surfkit.model.ApiRequest]
+  var buf = Vector.empty[ApiRequest]
 
   private def initBindings(channel: Channel): Unit = {
     channel.exchangeDeclare(sysExchange, "direct", true)
@@ -37,21 +41,21 @@ class RabbitModuleConsumer(val channel: Channel) extends ActorPublisher[io.surfk
     channel.basicQos(1)
   }
 
-  val source = Source[io.surfkit.model.ApiRequest](Props[RabbitModuleConsumer](this))
+  val source = Source[ApiRequest](Props[RabbitModuleConsumer](this))
   source
-    //.via(Flow[io.surfkit.model.Api].map(_))
+    .mapAsync(mapper)
     .to(Sink.foreach{
-    ret:io.surfkit.model.ApiRequest =>
+    ret:ApiResult =>
       val replyProps = new AMQP.BasicProperties
       .Builder()
         .correlationId(ret.routing.id)
         .build()
-
       println("In Sink...")
       println(ret)
       println(s"replyTo: ${ret.routing.reply}")
       println(s"corrId: ${ret.routing.id}")
-      channel.basicPublish( "", ret.routing.reply, replyProps, ret.data.getBytes())
+
+      channel.basicPublish( "", ret.routing.reply, replyProps, ret.data.toString.getBytes )
       //channel.basicAck(ret.routing.tag, false)
   }).run()
 
@@ -62,17 +66,19 @@ class RabbitModuleConsumer(val channel: Channel) extends ActorPublisher[io.surfk
                                  properties: AMQP.BasicProperties,
                                  body: Array[Byte]) = {
       println("** MODULE handleDelivery")
-      val rawHeaders = Option(properties.getHeaders).map(_.toMap).getOrElse(Map())
-      val headers = rawHeaders.mapValues(_.toString)
+      //val rawHeaders = Option(properties.getHeaders).map(_.toMap).getOrElse(Map())
+      //val headers = rawHeaders.mapValues(_.toString)
       val corrId =  properties.getCorrelationId
       val tagId = envelope.getDeliveryTag
 
       println(s"correlationId: $corrId")
-      println(rawHeaders)
 
-      val payload = ByteString(body).mkString
+      val payload = ByteString(body).decodeString("utf-8")
+      println(s"payload: $payload")
 
-      self ! io.surfkit.model.ApiRequest("module","op", io.surfkit.model.ApiRoute(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag), payload)
+      val apiReq = Json.parse(payload)
+
+      self ! ApiRequest( (apiReq \ "module").as[String], (apiReq \ "op").as[String], ApiRoute(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag), (apiReq \ "data") )
       //self ! RabbitMessage(envelope.getDeliveryTag, properties.getReplyTo(), properties.getCorrelationId, headers, ByteString(body))
 
       // when we know this data is for this modules...
@@ -83,7 +89,7 @@ class RabbitModuleConsumer(val channel: Channel) extends ActorPublisher[io.surfk
   var consumer: DefaultConsumer = null
 
   override def receive = {
-    case job: io.surfkit.model.ApiRequest =>
+    case job: ApiRequest =>
       //sender() ! JobAccepted
       if (buf.isEmpty && totalDemand > 0)
         onNext(job)

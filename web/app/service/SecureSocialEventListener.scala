@@ -8,7 +8,7 @@ package service
 import securesocial.core._
 import play.api.mvc.{Session, RequestHeader}
 import play.api.Logger
-import io.surfkit.model.User
+import io.surfkit.model.Auth.User
 
 /**
  * A sample event listener
@@ -23,7 +23,8 @@ class SecureSocialEventListener extends EventListener[User] {
       case PasswordChangeEvent(u) => "password change"
     }
 
-    Logger.info("traced %s event for user %s".format(eventName, event.user.main.userId))
+
+    Logger.info("traced %s event for user %s".format(eventName, event.user.main.id))
 
     // retrieving the current language
     Logger.info("current language is %s".format(request2lang(request)))

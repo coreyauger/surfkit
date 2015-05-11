@@ -4,6 +4,7 @@ package io.surfkit.core.service.v1
 import io.surfkit.core.Configuration
 import io.surfkit.core.websocket.WebSocket
 import akka.actor.{ ActorRef, ActorSystem }
+import play.api.libs.json.Json
 import spray.can.Http
 import spray.http.StatusCodes
 import spray.routing.Directives
@@ -26,13 +27,13 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
         pathPrefix("api"){
           post{
             implicit ctx =>
-            println("********************************")
-            v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,"")
+              println("********************************")
+              v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath, Json.parse(ctx.request.entity.asString))
           } ~
             get{
               implicit ctx =>
                 println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$4")
-                v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,"")
+                v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,Json.obj())
             }
         } ~
         getFromResourceDirectory(dir)

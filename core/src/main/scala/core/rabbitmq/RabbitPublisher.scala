@@ -1,5 +1,7 @@
 package io.surfkit.core.rabbitmq
 
+import core.api.modules.SurfKitModule.ApiRequest
+
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, Props}
 import com.rabbitmq.client.{QueueingConsumer, AMQP, Channel}
@@ -10,7 +12,7 @@ sealed trait RabbitMessage
 object RabbitPublisher {
   
   case class RabbitUserMessage(receiverUuid: String, provider: String, msg: JsValue) extends RabbitMessage
-  case class RabbitSystemMessage(appId:String, corrId: String, msg: JsValue) extends RabbitMessage
+  case class RabbitSystemMessage(appId:String, corrId: String, msg: ApiRequest) extends RabbitMessage
 
   def props(channel: Channel, replyQueueName: String): Props = Props(new RabbitPublisher(channel, replyQueueName))
 }
@@ -37,14 +39,12 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
     case RabbitSystemMessage(appId, corrId, msg) =>
       //val routingKey = s"${RabbitConfig.sysExchange}.$appId"
       val headers = Map("aid" -> appId)
-
-
-
       val props = new AMQP.BasicProperties
       .Builder()
         .correlationId(corrId)
         .replyTo(replyQueueName)
         .build()
+      // TODO: attach reply queue name to json routing
 
       log.debug(s"RabbitSystemMessage($appId, $msg) corrId: $corrId  reply -> $replyQueueName")
       channel.basicPublish(
@@ -52,7 +52,7 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
         RabbitConfig.sysExchange,  // no routing key
         //new AMQP.BasicProperties.Builder().headers(headers).build(),
         props,
-        msg.toString().getBytes()
+        Json.toJson(msg).toString().getBytes()
       )
   }
 }

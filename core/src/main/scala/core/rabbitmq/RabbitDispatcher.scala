@@ -1,7 +1,9 @@
 package io.surfkit.core.rabbitmq
 
 import akka.util.ByteString
+import core.api.modules.SurfKitModule.{ApiResult, ApiRequest}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
 
@@ -26,14 +28,14 @@ object RabbitConfig {
 object RabbitDispatcher {
 
   case object Connect
-  case object ConnectModule
+  case class ConnectModule(mapper: (ApiRequest) => Future[ApiResult])
   case object GetConnection
 
   case class RabbitMqAddress(host:String, port:Int)
 
   sealed trait RabbitSend
   case class SendUser(receiverUuid: String, provider: String, json: JsValue) extends RabbitSend
-  case class SendSys(appId: String, corrId:String, json: JsValue) extends  RabbitSend
+  case class SendSys(appId: String, corrId:String, req: ApiRequest ) extends  RabbitSend
 
   sealed trait State
   case object Connected extends State
@@ -86,13 +88,13 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
           setTimer("RabbitMQ reconnection", RabbitDispatcher.Connect, reconnectIn, false)
           stay
       }
-    case Event(RabbitDispatcher.ConnectModule, _) =>
+    case Event(RabbitDispatcher.ConnectModule(mapper), _) =>
       log.info("Connecting to RabbitMQ...")
       Try { factory.newConnection() } match {
         case Success(conn) =>
           conn.addShutdownListener(shutdownListener)
           val channel = conn.createChannel()
-          val consumer = context.actorOf(RabbitModuleConsumer.props(channel))
+          val consumer = context.actorOf(RabbitModuleConsumer.props(channel, mapper))
           goto(Connected) using BrokerConnection(conn, consumer)
         case Failure(f) =>
           log.error(f, s"Couldn't connect to RabbitMQ server at $address")

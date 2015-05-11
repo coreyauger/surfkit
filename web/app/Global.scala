@@ -1,13 +1,5 @@
 import java.lang.reflect.Constructor
 
-import akka.util.Timeout
-import com.github.mauricio.async.db.Connection
-import controllers.CustomRoutesService
-import play.api.Play.current
-import play.api.libs.concurrent.Akka
-import play.api.libs.json.Json
-
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 import controllers.CustomRoutesService
@@ -15,7 +7,7 @@ import java.lang.reflect.Constructor
 import securesocial.core.RuntimeEnvironment
 
 import service._
-import io.surfkit.model.User
+import io.surfkit.model.Auth.User
 
 
 object Global extends play.api.GlobalSettings {

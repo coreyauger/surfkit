@@ -1,6 +1,7 @@
 package io.surfkit.core.service.v1
 
 import akka.actor.{ActorRef, Actor, ActorLogging}
+import core.api.modules.SurfKitModule.{ApiRoute, ApiRequest}
 import io.surfkit.core.Configuration
 import play.api.libs.json._
 import io.surfkit.core.rabbitmq.{RabbitSysConsumer, RabbitDispatcher}
@@ -13,8 +14,7 @@ object RabbitMqActor {
   sealed trait MqMessage
   case object Clear extends MqMessage
   case class Unregister(ws : WebSocket) extends MqMessage
-  case class Mq(responder: ActorRef, path : Uri.Path, data : String) extends MqMessage
-  case class Response(responder: ActorRef, path : Uri.Path, data : String) extends MqMessage
+  case class Mq(responder: ActorRef, path : Uri.Path, data : JsValue) extends MqMessage
 }
 
 class RabbitMqActor extends Actor with ActorLogging {
@@ -53,11 +53,19 @@ class RabbitMqActor extends Actor with ActorLogging {
       //log.debug("sent to {} clients to clear marker '{}'", clients.size, msg)
       val corrId = java.util.UUID.randomUUID().toString
       responders += corrId -> responder
-      rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, Json.obj())
+      val slotOp = path.tail.toString.split('/').toList
+      slotOp match{
+        case module :: op :: Nil =>
+          val req = ApiRequest(module, op,ApiRoute(corrId,"",0L), mq.data)
+          rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
+        case _ =>
+          log.error(s"Invalid API request with path: $path")
+      }
+
 
     case mq @ RabbitSysConsumer.RabbitMessage(deliveryTag, correlationId, headers, body) =>
       println(s"Sending with a corrId: $correlationId")
-      responders.get(correlationId).map(_ ! HttpResponse(entity = body.mkString))
+      responders.get(correlationId).map(_ ! HttpResponse(entity = body.decodeString("utf-8")))
       responders -= correlationId
 
     case whatever =>
