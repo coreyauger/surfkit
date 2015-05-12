@@ -12,7 +12,6 @@ import spray.routing.Directives
 class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Directives {
   lazy val route =
     pathPrefix("v1") {
-      println("here............................")
       val dir = "v1/"
       pathEndOrSingleSlash {
         getFromResource(dir + "index.html")

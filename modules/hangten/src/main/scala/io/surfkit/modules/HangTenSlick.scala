@@ -1,12 +1,12 @@
 package io.surfkit.modules
 
-import io.surfkit.model._
-import scala.concurrent.ExecutionContext.Implicits.global
-
 import slick.driver.PostgresDriver.api._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
+import io.surfkit.model._
+import io.surfkit.model.Auth._
 
 /**
  * Created by suroot on 08/05/15.
@@ -16,9 +16,6 @@ object HangTenSlick{
 
   val db = Database.forURL("jdbc:postgresql://localhost:5432/sktest", user = "postgres", password = "Neverdull42",
     driver = "org.postgresql.Driver",  executor = AsyncExecutor("executor1", numThreads=10, queueSize=1000))
-
-
-  import io.surfkit.model.Auth.SurfKitUser
   // Definition of the Provider table
   class SurfKitUser(tag: Tag) extends Table[Auth.SurfKitUser](tag, "Users") {
     def id = column[Long]("user_id", O.PrimaryKey, O.AutoInc)

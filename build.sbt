@@ -156,6 +156,7 @@ lazy val coreDeps = {
     "io.spray"          %%  "spray-routing-shapeless2"          % sprayV,
     "com.rabbitmq"       %  "amqp-client"                       % "3.3.5",
     "com.wandoulabs.akka" %%  "spray-websocket"                 % "0.1.4",
+    "com.lihaoyi"       %% "upickle"                            % "0.2.8",
     "com.typesafe.play" %% "play-json"                          % "2.3.4",
     "org.scalatest"     %% "scalatest"                          % scalaTestV % "test"
   )

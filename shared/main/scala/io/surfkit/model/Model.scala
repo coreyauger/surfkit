@@ -12,7 +12,7 @@ object Auth{
   /**
    * A minimal user profile
    */
-  trait UserProfile extends Model {
+  sealed trait UserProfile extends Model {
     def providerId: String
     def userId: String
   }
@@ -20,7 +20,7 @@ object Auth{
   /**
    * A generic profile
    */
-  trait GenericProfile extends UserProfile {
+  sealed trait GenericProfile extends UserProfile {
     def firstName: Option[String]
     def lastName: Option[String]
     def fullName: Option[String]
@@ -53,6 +53,7 @@ object Auth{
 
 
   case class FindUser(appId: String, providerId:String, userId:String) extends Model
+  case class GetFriends(appId: String, userId:Long ) extends Model
   case class SaveResponse(userId: Long) extends Model
   case class OAuth1Info(token: String, secret: String) extends Model
   case class OAuth2Info(accessToken: String, tokenType: Option[String] = None, expiresIn: Option[Int] = None, refreshToken: Option[String] = None) extends  Model
@@ -66,6 +67,12 @@ object Auth{
     val UserPassword = AuthenticationMethod("userPassword")
   }
 
+  case class ProfileInfo(provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String)
+
+}
+
+object WS{
+  case class WebSocketOp(module:String, op:String, data:Model) extends Model
 }
 
 

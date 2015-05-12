@@ -17,14 +17,18 @@ class WebSocketServer(val serverConnection: ActorRef, val route: Route) extends 
   override def receive = matchRoute(route) orElse handshaking orElse closeLogic
   private def matchRoute(route : Route) : Receive = {
     case request : HttpRequest =>
+      log.debug("request")
       val ctx = RequestContext(request, self, request.uri.path)
       log.debug("HTTP request for uri {}", request.uri.path)
       route(ctx.withResponder(self))
+      println("handshaking")
       handshaking(request)
     case WebSocket.Register(request, actor, ping) =>
+      log.debug("WebSocket.Register")
       if (ping) pinger = Some(context.system.scheduler.scheduleOnce(110.seconds, self, WebSocket.Ping))
       handler = actor
       uripath = request.uri.path.toString
+      println(s"Handler: $handler")
       handler ! WebSocket.Open(this)
     case Rejected(rejections) =>
       log.info("Rejecting with {}", rejections)
@@ -55,8 +59,12 @@ class WebSocketServer(val serverConnection: ActorRef, val route: Route) extends 
       handler ! WebSocket.Close(this, StatusCode.GoingAway.code, "")
     case WebSocket.Release =>
       handler ! WebSocket.Close(this, StatusCode.NormalClose.code, "")
+    case message:String =>
+      log.debug("WebSocket message '{}'", message)
+      handler ! WebSocket.Message(this, message)
     case whatever =>
-      log.debug("WebSocket received '{}'", whatever)
+      println(whatever.getClass.getTypeName)
+      log.debug("WebSocket ?? '{}'", whatever)
   }
   def send(message : String) = send(TextFrame(message))
   def close() = send(CloseFrame(StatusCode.NormalClose))
