@@ -76,6 +76,13 @@ object WS{
 }
 
 
+object Api {
+
+  case class ApiRoute(id: String, reply: String, tag: Long) extends Model
+  case class ApiRequest(module: String, op: String, routing: ApiRoute, data: String) extends Model
+  case class ApiResult(module: String, op: String, routing: ApiRoute, data: String) extends Model
+
+}
 
 
 case class SearchResult(id: String, title:String, description: String ) extends Model

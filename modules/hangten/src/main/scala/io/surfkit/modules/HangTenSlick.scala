@@ -44,7 +44,7 @@ object HangTenSlick{
 
   case class FlatProviderProfile(
       id:Long,
-      UserKey:Long,
+      userKey:Long,
       appId:String,
       providerId:String,
       userId:String,
@@ -103,7 +103,7 @@ object HangTenSlick{
     implicit def FlatProviderToProvider(p: FlatProviderProfile): Auth.ProviderProfile =
       Auth.ProviderProfile(
         p.id,
-        p.UserKey,
+        p.userKey,
         p.appId,
         p.providerId,
         p.userId,

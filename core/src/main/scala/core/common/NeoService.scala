@@ -53,6 +53,7 @@ trait NeoService {
     def getManyJs(implicit neoServer:Neo4JServer): Future[JsArray] = neoPost.map(JsArray)
 
     def getMany[T](implicit neoServer:Neo4JServer, r: Reads[T]): Future[Seq[T]] = neoPost.map { results =>
+      println(results)
       results.map(_.as[T])
     }
 

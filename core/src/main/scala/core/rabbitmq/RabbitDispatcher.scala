@@ -1,8 +1,7 @@
 package io.surfkit.core.rabbitmq
 
 import akka.util.ByteString
-import core.api.modules.SurfKitModule.{ApiResult, ApiRequest}
-
+import io.surfkit.model.Api._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}

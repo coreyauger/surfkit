@@ -1,10 +1,10 @@
 package io.surfkit.modules
 
-import java.util.UUID
+import java.util.{Date, UUID}
 
 import akka.util.Timeout
 import core.common.NeoService
-import play.api.libs.json.{JsObject, JsArray, Json}
+import play.api.libs.json.{JsValue, JsObject, JsArray, Json}
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -12,6 +12,8 @@ import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
 
 import io.surfkit.model._
+
+import scala.util.Success
 
 trait UserGraph extends NeoService {
 
@@ -85,9 +87,11 @@ trait UserGraph extends NeoService {
   def getProviders(uid: Long): Future[JsArray] = getProvidersQ(uid).getManyJs
 
 
-  def mergeFriends(uid: Long, friends: Seq[JsObject], provider: String) =
+  def mergeFriends(uid: Long, friends: Seq[JsObject], provider: String) = {
   // (CA) - right now add the provider to ALL profiles of that user..
-    Q("""
+    println(s"PROPS: $friends")
+    Q(
+      """
         MATCH (u: User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(pu:Provider)
         WHERE u.uid = {uid} AND pu.name = {provider}
         FOREACH (p in {props} |
@@ -95,7 +99,9 @@ trait UserGraph extends NeoService {
           ON CREATE SET f = p
         CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
         RETURN u
-      """).use("uid" -> uid.toString, "provider" -> provider, "props" -> friends).run()
+      """).use("uid" -> uid.toString, "provider" -> provider, "props" -> friends).run(
+      )
+    }
 
   def addAppFriends(appId: String, uid: Long, jids: Seq[String], providerLink: Option[String]) =
     Q("""
@@ -308,18 +314,49 @@ trait UserGraph extends NeoService {
 
   }
 
+  def getUserFriendsQ(uid: Long, nodeId:Long = 0) = Q(s"""
+          | MATCH (u:User {uid:{uid}})-[:MANAGES]->(r:Profile)-[:HAS_ACCOUNT]->(up:Provider)-[:FRIEND]->(p)
+          | WHERE ID(p) > ${nodeId}
+          | RETURN p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl, str(ID(p)) as node;
+        """.stripMargin).use("uid" -> uid)
+  def getUserFriends(uid:Long, node:Long = 0) = getUserFriendsQ(uid, node).getMany[Auth.ProfileInfo]
 
-  //Do we really need all those return projections
-  def getMembersDetailsQ(chatId: String) =
-    Q(
-      """
-        |MATCH
-        |   (u)-[:MEMBER_OF]->(c {chatId:{chatId}})
-        |MATCH
-        |   (u)-[:HAS_ACCOUNT]->(p:Provider)
-        |RETURN c.chatId as chatId, u.uid as uid, c.name as group, u.token as token, p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl;
-      """
-    ).use("chatId" -> chatId)
-  def getMembersDetails(chatId: String) = getMembersDetailsQ(chatId).getManyJs
+
+  def addFriendsForUser(uid:Long, provider:String, roster:List[Auth.ProfileInfo]) = {
+    //val roster = (json \ "data" \ "roster").as[List[JsValue]]
+    // TODO: fix error seen in log "head of empty list "
+    //val provider = (json \ "data" \ "roster" \\ "provider").head.as[String]
+    //val providerLink = (json \ "data" \ "link").as[Option[String]]
+
+
+    val t1 = new Date().getTime()
+    getUserFriends(uid, 0).onSuccess {
+      case friends:List[Auth.ProfileInfo] =>
+        val friendMap = friends.map(f => (f.jid, f)).toMap
+
+        val toAdd: List[JsObject] = roster.filterNot(f => friendMap.contains(f.jid)).map(c =>Json.obj("name" -> provider, "jid" -> c.jid, "id" -> c.id, "fullName" -> c.fullName, "avatarUrl" -> c.avatarUrl, "email" -> c.email))
+        mergeFriends(uid, toAdd, provider).onSuccess { case _ =>
+          //userActor ! JsonRequest("friends-friends", Json.obj("op" -> "friends", "slot" -> "friends", "data" -> Json.obj("uuid" -> uuid)));
+          // TODO:  ...
+          //addAppFriends(uid, toAdd.map(f => (f \ "jid").as[String]), providerLink).onFailure { case e =>
+          //  e.printStackTrace()
+          //}
+          println("set roster took " + (new Date().getTime() - t1) + " ms for " + toAdd.size + " friends")
+        }
+    }
+  }
+
+
+  def addFriendsToGraph(uid:Long, user:Auth.ProviderProfile) =
+    user.providerId match{
+      case "facebook" =>
+        println(s"https://graph.facebook.com/v2.3/me/friends?access_token=${user.oAuth2Info.map(o => o.accessToken).get}")
+        ws.url(s"https://graph.facebook.com/v2.3/me/friends?access_token=${user.oAuth2Info.map(o => o.accessToken).getOrElse("")}").get().map{
+        resp =>
+          val flist = (resp.json \ "data").as[List[JsValue]]
+          addFriendsForUser(uid, "facebook", flist.map(f => Auth.ProfileInfo("facebook", (f \ "id").as[String], (f \ "name").as[String], "", s"${(f \ "id").as[String]}@chat.facebook.com", s"http://graph.facebook.com/${(f \ "id").as[String]}/picture?type=square")))
+      }
+    }
+
 
 }

@@ -3,8 +3,8 @@ package io.surfkit.core.rabbitmq
 import akka.stream.actor.ActorPublisher
 import akka.stream.scaladsl.{Source, Sink, Flow}
 import akka.stream.ActorFlowMaterializer
-import core.api.modules.SurfKitModule.{ApiRoute, ApiResult, ApiRequest}
-import play.api.libs.json.{Format, Json}
+import io.surfkit.model.Api._
+import play.api.libs.json.{JsArray, Format, Json}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
@@ -55,7 +55,8 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Fut
       println(s"replyTo: ${ret.routing.reply}")
       println(s"corrId: ${ret.routing.id}")
 
-      channel.basicPublish( "", ret.routing.reply, replyProps, ret.data.toString.getBytes )
+      //channel.basicPublish( "", ret.routing.reply, replyProps, ret.data.toString.getBytes )
+      channel.basicPublish( "", ret.routing.reply, replyProps, upickle.write( ret ).getBytes )
       //channel.basicAck(ret.routing.tag, false)
   }).run()
 
@@ -76,9 +77,10 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Fut
       val payload = ByteString(body).decodeString("utf-8")
       println(s"payload: $payload")
 
-      val apiReq = Json.parse(payload)
+      val apiReq = upickle.read[ApiRequest](payload)
+      println(s"apiReq: $apiReq")
 
-      self ! ApiRequest( (apiReq \ "module").as[String], (apiReq \ "op").as[String], ApiRoute(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag), (apiReq \ "data") )
+      self ! ApiRequest( apiReq.module, apiReq.op, ApiRoute(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag), apiReq.data )
       //self ! RabbitMessage(envelope.getDeliveryTag, properties.getReplyTo(), properties.getCorrelationId, headers, ByteString(body))
 
       // when we know this data is for this modules...

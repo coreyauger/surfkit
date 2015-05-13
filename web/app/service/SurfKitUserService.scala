@@ -4,6 +4,7 @@ package service
  * Created by suroot on 04/05/15.
  */
 
+import io.surfkit.model.Auth
 import play.api.Play.current
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
@@ -15,6 +16,9 @@ import scala.concurrent.Future
 import securesocial.core.services.{ UserService, SaveMode }
 
 import io.surfkit.model.Auth.{SurfKitUser, User, ProviderProfile}
+import io.surfkit.model.Api.{ApiRequest,ApiResult}
+
+import scala.util.Try
 
 object ProfileImplicits {
   implicit def BasicProfile2ProviderProfile(u : BasicProfile):ProviderProfile =
@@ -55,7 +59,7 @@ object ProfileImplicits {
 
   implicit def SkPassworInfo2PasswordInfo(p:io.surfkit.model.Auth.PasswordInfo):PasswordInfo  =
     PasswordInfo(p.hasher, p.password, p.salt)
-
+/*
   // CA - this is required....
   import io.surfkit.model.Auth._
 
@@ -79,6 +83,7 @@ object ProfileImplicits {
   implicit val rw     = Json.writes[io.surfkit.model.Auth.FindUser]
 
   implicit val rsr    = Json.reads[io.surfkit.model.Auth.SaveResponse]
+  */
 }
 
 
@@ -92,14 +97,14 @@ class SurfKitUserService extends UserService[User] {
   private var tokens = Map[String, MailToken]()
 
   def find(providerId: String, userId: String): Future[Option[BasicProfile]] = {
-    import ProfileImplicits._
     logger.info(s"SurfKitUserService.find($providerId, $userId)")
     if (logger.isDebugEnabled) {
       logger.debug("users = %s".format(users))
     }
-    WS.url(s"$surfkitEndpoint/auth/find").post( Json.toJson(io.surfkit.model.Auth.FindUser("APPID",providerId,userId)) ).map{
+    WS.url(s"$surfkitEndpoint/auth/find").post( upickle.write(io.surfkit.model.Auth.FindUser("APPID",providerId,userId)) ).map{
       res =>
-        res.json.asOpt[ProviderProfile]
+        val apiRes = upickle.read[ApiResult](res.json.toString)
+        ProfileImplicits.ProviderProfile2BasicProfile(Try(upickle.read[ProviderProfile](apiRes.data)).toOption)
     }
   }
 
@@ -123,11 +128,12 @@ class SurfKitUserService extends UserService[User] {
 
   private def saveProfile(user: BasicProfile):Future[User] = {
     import ProfileImplicits._
-    WS.url(s"$surfkitEndpoint/auth/save").post(Json.toJson( ProfileImplicits.BasicProfile2ProviderProfile(user))).map {
+    WS.url(s"$surfkitEndpoint/auth/save").post(upickle.write( ProfileImplicits.BasicProfile2ProviderProfile(user))).map {
       res =>
         println(s"ret json: ${res.json}")
         // TODO: if userId return is zero then we failed to save ...
-        val sr = res.json.as[io.surfkit.model.Auth.SaveResponse]
+        val apiRes = upickle.read[ApiResult](res.json.toString)
+        val sr = upickle.read[io.surfkit.model.Auth.SaveResponse](apiRes.data)
         User(SurfKitUser(sr.userId, "token", user.fullName, user.avatarUrl, user.email), List[ProviderProfile]())
     }
   }

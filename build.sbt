@@ -127,6 +127,7 @@ lazy val webDeps = Seq(
     "com.github.mauricio"         %% "postgresql-async"    % "0.2.15",
     "ws.securesocial"             %% "securesocial"        % "3.0-M3",
     "org.scalatestplus"           %% "play"                % "1.2.0" % "test",
+    "com.lihaoyi"                 %% "upickle"             % "0.2.8",
     "org.webjars"                 % "bootstrap"            % "3.3.4",
     "org.webjars"                 % "jquery"               % "2.1.4",
     "org.webjars"                 % "react"                % "0.13.1"
@@ -156,8 +157,8 @@ lazy val coreDeps = {
     "io.spray"          %%  "spray-routing-shapeless2"          % sprayV,
     "com.rabbitmq"       %  "amqp-client"                       % "3.3.5",
     "com.wandoulabs.akka" %%  "spray-websocket"                 % "0.1.4",
-    "com.lihaoyi"       %% "upickle"                            % "0.2.8",
     "com.typesafe.play" %% "play-json"                          % "2.3.4",
+    "com.lihaoyi"       %% "upickle"                            % "0.2.8",
     "org.scalatest"     %% "scalatest"                          % scalaTestV % "test"
   )
 }

@@ -26,6 +26,8 @@ class Networking {
   ws.onmessage = (x: MessageEvent) => {
     println("WS onmessage")
     println(x.data.toString)
+    val list = upickle.read[List[Auth.ProfileInfo]](x.data.toString)
+    println(list)
   }
   ws.onopen = (x: Event) => {
     println("WS connection open")
@@ -36,9 +38,7 @@ class Networking {
   }
 
   def test(v:String) = {
-
     val getFriends = upickle.write(WS.WebSocketOp("Auth","friends",Auth.GetFriends("APPID",1)))
     ws.send(getFriends)
-    //ws.send("{\"module\":\"Auth\",\"op\":\"friends\",\"data\":{\"appId\":\"APPID\",\"userId\":1}}")
   }
 }

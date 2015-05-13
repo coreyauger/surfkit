@@ -2,22 +2,22 @@ package core.api.modules
 
 
 import akka.actor.ActorRef
-import core.api.modules.SurfKitModule.{ApiResult, ApiRequest}
 import play.api.libs.json._
+import io.surfkit.model.Api._
 import io.surfkit.model.Model
-
 
 import scala.concurrent.Future
 
+/*
 object SurfKitModule {
 
   sealed trait Api
 
   case class ApiRoute(id: String, reply: String, tag: Long) extends Api
 
-  case class ApiRequest(module: String, op: String, routing: ApiRoute, data: JsValue) extends Api
+  case class ApiRequest(module: String, op: String, routing: ApiRoute, data: String) extends Api
 
-  case class ApiResult(module: String, op: String, routing: ApiRoute, data: JsValue) extends Api
+  case class ApiResult(module: String, op: String, routing: ApiRoute, data: String) extends Api
 
   implicit val rr     = Json.reads[ApiRoute]
   implicit val wr    = Json.writes[ApiRoute]
@@ -29,6 +29,7 @@ object SurfKitModule {
   implicit val wres    = Json.writes[ApiResult]
 
 }
+*/
 /**
  * Created by suroot on 08/05/15.
  */
@@ -37,7 +38,9 @@ trait SurfKitModule {
 
   def actions(r:ApiRequest): PartialFunction[io.surfkit.model.Model, Future[ApiResult]]
 
+  /*
   def validate[T <: io.surfkit.model.Model](r: ApiRequest)(implicit reader: Reads[T]) = {
+
     r.data.validate[T] match {
       case JsSuccess(msg, _) => actions(r)(msg)
       case JsError(e)        =>
@@ -46,6 +49,8 @@ trait SurfKitModule {
         Future.successful(ApiResult(r.module, r.op, r.routing, Json.obj()))
       //sender ! MessageProcessError(JsError.toFlatJson(e))
     }
+
   }
+  */
 
 }

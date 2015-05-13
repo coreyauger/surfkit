@@ -3,7 +3,6 @@ package io.surfkit.core.service.v1
 import java.util.UUID
 
 import akka.actor.{ActorRef, Actor, ActorLogging}
-import core.api.modules.SurfKitModule.{ApiRoute, ApiRequest}
 import io.surfkit.core.Configuration
 import play.api.libs.json._
 import io.surfkit.core.rabbitmq.{RabbitSysConsumer, RabbitDispatcher}
@@ -12,6 +11,7 @@ import spray.http.{HttpResponse, Uri}
 import scala.collection.mutable
 import io.surfkit.core.websocket._
 import io.surfkit.model._
+import io.surfkit.model.Api._
 
 object RabbitMqActor {
   sealed trait MqMessage
@@ -58,7 +58,7 @@ class RabbitMqActor extends Actor with ActorLogging {
         wsMap.get(ws) match{
           case Some(corrId) =>
             // TODO: this sux below => Json.parse( upickle.write(wsOp.data) )
-            val req = ApiRequest(wsOp.module, wsOp.op, ApiRoute(corrId,"",0L), Json.parse( upickle.write(wsOp.data) ) )
+            val req = Api.ApiRequest(wsOp.module, wsOp.op, Api.ApiRoute(corrId,"",0L), upickle.write(wsOp.data) )
             rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
           case None =>
             log.error("[ERROR] There is no corrId for this websocket")
@@ -81,7 +81,7 @@ class RabbitMqActor extends Actor with ActorLogging {
       val slotOp = path.tail.toString.split('/').toList
       slotOp match{
         case module :: op :: Nil =>
-          val req = ApiRequest(module, op,ApiRoute(corrId,"",0L), mq.data)
+          val req = Api.ApiRequest(module, op,Api.ApiRoute(corrId,"",0L), mq.data.toString)
           rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
         case _ =>
           log.error(s"Invalid API request with path: $path")

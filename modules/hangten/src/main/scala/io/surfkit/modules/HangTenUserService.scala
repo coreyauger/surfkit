@@ -3,7 +3,7 @@ package io.surfkit.modules
 import akka.actor.ActorSystem
 import akka.event.Logging
 import core.api.modules.SurfKitModule
-import core.api.modules.SurfKitModule.{ApiRequest, ApiResult}
+import io.surfkit.model.Api._
 import io.surfkit.core.rabbitmq.RabbitDispatcher
 import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import play.api.libs.json.Json
@@ -42,11 +42,11 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
             r.module,
             r.op,
             r.routing,
-            Json.toJson(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)))
+            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)))
       }.recover {
         case _ =>
           // TODO: better case for not found then empty object?
-          ApiResult(r.module, r.op, r.routing, Json.obj())
+          ApiResult(r.module, r.op, r.routing, "")
       }
 
     case p:Auth.ProviderProfile =>
@@ -55,39 +55,49 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
         case pro:Seq[HangTenSlick.FlatProviderProfile] =>
           println(s"LENGTH: ${pro.length}")
           // TODO: write an update
-          Future.successful( ApiResult(r.module, r.op, r.routing, Json.toJson(Auth.SaveResponse(pro.head.id))))
+          val h = pro.head
+          addFriendsToGraph(h.userKey, p)
+          Future.successful( ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(pro.head.id))))
       }.recoverWith {
         case _ =>
           println("could not find.. running save..")
           HangTenSlick.saveProvider(p).map{
             id =>
-              saveUserGraph(id,p)
-              ApiResult(r.module, r.op, r.routing, Json.toJson(Auth.SaveResponse(id)) )
+              saveUserGraph(id,p).onSuccess{
+                case _ =>
+                  // try to import friends for this provider
+                  addFriendsToGraph(id, p)
+              }
+              ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(id)) )
           }.recover {
             case _ =>
-              ApiResult(r.module, r.op, r.routing, Json.toJson(Auth.SaveResponse(0L)))
+              ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(0L)))
           }
       }
 
     case g:Auth.GetFriends =>
-      getFriends(g.userId).map{
+      getUserFriends(g.userId).map{
         jsArr =>
-          ApiResult(r.module, r.op, r.routing, jsArr)
+          print("#############################")
+          //println(jsArr)
+          println(upickle.write[Seq[Auth.ProfileInfo]](jsArr))
+          ApiResult(r.module, r.op, r.routing, upickle.write[Seq[Auth.ProfileInfo]](jsArr))
       }
   }
 
 
-  def mapper(r:ApiRequest):Future[ApiResult] =
-    r.op match{
-      case "find"         => validate[Auth.FindUser](r)
-      case "save"         => validate[Auth.ProviderProfile](r)
-      case "friends"      => validate[Auth.GetFriends](r)
+  def mapper(r:ApiRequest):Future[ApiResult] = {
+    println("IN THE MAPPER ...")
+    r.op match {
+      case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
+      case "save" => actions(r)(upickle.read[Auth.ProviderProfile](r.data.toString))
+      case "friends" => actions(r)(upickle.read[Auth.GetFriends](r.data.toString))
       case _ =>
         logger.error("Unknown operation.")
         // TODO: ...
-        Future.successful(ApiResult(r.module, r.op, r.routing, Json.obj() ))
+        Future.successful(ApiResult(r.module, r.op, r.routing, ""))
     }
-
+  }
 
   // Let's HangTen !
   val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))

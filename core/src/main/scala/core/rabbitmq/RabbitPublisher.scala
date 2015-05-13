@@ -1,6 +1,6 @@
 package io.surfkit.core.rabbitmq
 
-import core.api.modules.SurfKitModule.ApiRequest
+import io.surfkit.model.Api._
 
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, Props}
@@ -52,7 +52,7 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
         RabbitConfig.sysExchange,  // no routing key
         //new AMQP.BasicProperties.Builder().headers(headers).build(),
         props,
-        Json.toJson(msg).toString().getBytes()
+        upickle.write(msg).getBytes()
       )
   }
 }
