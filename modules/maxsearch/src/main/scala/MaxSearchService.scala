@@ -1,8 +1,7 @@
-package io.surfkit.modules
-
 import akka.actor.ActorSystem
 import akka.event.Logging
 import core.api.modules.SurfKitModule
+import io.surfkit.model.Api._
 import io.surfkit.core.rabbitmq.RabbitDispatcher
 import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import play.api.libs.json.Json
@@ -17,33 +16,21 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
   val logger = Logging(system, getClass)
 
   val db = HangTenSlick.db
-  import io.surfkit.model.Auth._
-  implicit val pir    = Json.reads[Auth.PasswordInfo]
-  implicit val piw    = Json.writes[Auth.PasswordInfo]
-  implicit val oa1r   = Json.reads[Auth.OAuth1Info]
-  implicit val oa1w   = Json.writes[Auth.OAuth1Info]
-  implicit val oa2r   = Json.reads[Auth.OAuth2Info]
-  implicit val oa2w   = Json.writes[Auth.OAuth2Info]
-  implicit val amr    = Json.reads[Auth.AuthenticationMethod]
-  implicit val amw    = Json.writes[Auth.AuthenticationMethod]
-  implicit val pr     = Json.reads[Auth.ProviderProfile]
-  implicit val pw     = Json.writes[Auth.ProviderProfile]
-  implicit val raf    = Json.reads[Auth.FindUser]
-  implicit val rff    = Json.reads[Auth.GetFriends]
-  implicit val wsr    = Json.writes[Auth.SaveResponse]
 
-  def actions(r:Api.Request): PartialFunction[Model, Future[Api.Result]] = {
+  def actions(r:ApiRequest): PartialFunction[Model, Future[ApiResult]] = {
     case Auth.FindUser(appId:String, providerId: String, userId: String) =>
       logger.debug(s"Auth.FindUser($appId, $providerId, $userId)")
       HangTenSlick.getProvider(appId, providerId, userId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
-          Api.Result(0,
+          ApiResult(
             r.module,
             r.op,
-            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)),r.routing)
+            r.routing,
+            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)))
       }.recover {
         case _ =>
-          Api.Result(1, r.module, r.op, "",r.routing)
+          // TODO: better case for not found then empty object?
+          ApiResult(r.module, r.op, r.routing, "")
       }
 
     case p:Auth.ProviderProfile =>
@@ -54,7 +41,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           // TODO: write an update
           val h = pro.head
           addFriendsToGraph(h.userKey, p)
-          Future.successful( Api.Result(0,r.module, r.op, upickle.write(Auth.SaveResponse(pro.head.id)), r.routing))
+          Future.successful( ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(pro.head.id))))
       }.recoverWith {
         case _ =>
           println("could not find.. running save..")
@@ -65,10 +52,10 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
                   // try to import friends for this provider
                   addFriendsToGraph(id, p)
               }
-              Api.Result(0, r.module, r.op, upickle.write(Auth.SaveResponse(id)), r.routing )
+              ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(id)) )
           }.recover {
             case _ =>
-              Api.Result(1, r.module, r.op, upickle.write(Auth.SaveResponse(0L)),r.routing)
+              ApiResult(r.module, r.op, r.routing, upickle.write(Auth.SaveResponse(0L)))
           }
       }
 
@@ -78,12 +65,12 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           print("#############################")
           //println(jsArr)
           println(upickle.write[Seq[Auth.ProfileInfo]](jsArr))
-          Api.Result(0, r.module, r.op, upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
+          ApiResult(r.module, r.op, r.routing, upickle.write[Seq[Auth.ProfileInfo]](jsArr))
       }
   }
 
 
-  def mapper(r:Api.Request):Future[Api.Result] = {
+  def mapper(r:ApiRequest):Future[ApiResult] = {
     println("IN THE MAPPER ...")
     r.op match {
       case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
@@ -91,7 +78,8 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
       case "friends" => actions(r)(upickle.read[Auth.GetFriends](r.data.toString))
       case _ =>
         logger.error("Unknown operation.")
-        Future.successful(Api.Result(1, r.module, r.op, upickle.write(Api.Error("Unknown operation.")), r.routing))
+        // TODO: ...
+        Future.successful(ApiResult(r.module, r.op, r.routing, ""))
     }
   }
 

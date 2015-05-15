@@ -1,7 +1,7 @@
 package io.surfkit.core.rabbitmq
 
 import akka.util.ByteString
-import io.surfkit.model.Api._
+import io.surfkit.model._
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Try, Success, Failure}
@@ -27,14 +27,14 @@ object RabbitConfig {
 object RabbitDispatcher {
 
   case object Connect
-  case class ConnectModule(mapper: (ApiRequest) => Future[ApiResult])
+  case class ConnectModule(mapper: (io.surfkit.model.Api.Request) => Future[Api.Result])
   case object GetConnection
 
   case class RabbitMqAddress(host:String, port:Int)
 
   sealed trait RabbitSend
   case class SendUser(receiverUuid: String, provider: String, json: JsValue) extends RabbitSend
-  case class SendSys(appId: String, corrId:String, req: ApiRequest ) extends  RabbitSend
+  case class SendSys(appId: String, corrId:String, req: io.surfkit.model.Api.Request ) extends  RabbitSend
 
   sealed trait State
   case object Connected extends State

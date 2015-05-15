@@ -3,7 +3,7 @@ package io.surfkit.core.rabbitmq
 import akka.stream.actor.ActorPublisher
 import akka.stream.scaladsl.{Source, Sink, Flow}
 import akka.stream.ActorFlowMaterializer
-import io.surfkit.model.Api._
+import io.surfkit.model._
 import play.api.libs.json.{JsArray, Format, Json}
 
 import scala.annotation.tailrec
@@ -20,19 +20,19 @@ object RabbitModuleConsumer {
   lazy val sysExchange = RabbitConfig.sysExchange
 
 
-  def props(channel: Channel, mapper: (ApiRequest) => Future[ApiResult]) =
+  def props(channel: Channel, mapper: (Api.Request) => Future[Api.Result]) =
     Props(new RabbitModuleConsumer(channel, mapper))
 }
 
 
-class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Future[ApiResult]) extends ActorPublisher[ApiRequest] with ActorLogging {
+class RabbitModuleConsumer(val channel: Channel, val mapper: (Api.Request) => Future[Api.Result]) extends ActorPublisher[Api.Request] with ActorLogging {
   import akka.stream.actor.ActorPublisherMessage._
   import io.surfkit.core.rabbitmq.RabbitModuleConsumer._
 
   implicit val materializer = ActorFlowMaterializer()
 
   val MaxBufferSize = 100
-  var buf = Vector.empty[ApiRequest]
+  var buf = Vector.empty[Api.Request]
 
   private def initBindings(channel: Channel): Unit = {
     channel.exchangeDeclare(sysExchange, "direct", true)
@@ -41,17 +41,17 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Fut
     channel.basicQos(1)
   }
 
-  val source = Source[ApiRequest](Props[RabbitModuleConsumer](this))
+  val source = Source[Api.Request](Props[RabbitModuleConsumer](this))
   source
     .mapAsync(mapper)
     .to(Sink.foreach{
-    ret:ApiResult =>
+    ret:Api.Result =>
       val replyProps = new AMQP.BasicProperties
       .Builder()
         .correlationId(ret.routing.id)
         .build()
       println("In Sink...")
-      println(ret)
+      println(ret.op)
       println(s"replyTo: ${ret.routing.reply}")
       println(s"corrId: ${ret.routing.id}")
 
@@ -77,10 +77,10 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Fut
       val payload = ByteString(body).decodeString("utf-8")
       println(s"payload: $payload")
 
-      val apiReq = upickle.read[ApiRequest](payload)
+      val apiReq = upickle.read[Api.Request](payload)
       println(s"apiReq: $apiReq")
 
-      self ! ApiRequest( apiReq.module, apiReq.op, ApiRoute(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag), apiReq.data )
+      self ! Api.Request( apiReq.module, apiReq.op, apiReq.data, Api.Route(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag) )
       //self ! RabbitMessage(envelope.getDeliveryTag, properties.getReplyTo(), properties.getCorrelationId, headers, ByteString(body))
 
       // when we know this data is for this modules...
@@ -91,7 +91,7 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (ApiRequest) => Fut
   var consumer: DefaultConsumer = null
 
   override def receive = {
-    case job: ApiRequest =>
+    case job: Api.Request =>
       //sender() ! JobAccepted
       if (buf.isEmpty && totalDemand > 0)
         onNext(job)

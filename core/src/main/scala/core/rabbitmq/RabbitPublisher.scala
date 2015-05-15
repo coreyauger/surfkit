@@ -1,6 +1,6 @@
 package io.surfkit.core.rabbitmq
 
-import io.surfkit.model.Api._
+import io.surfkit.model._
 
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, Props}
@@ -12,7 +12,7 @@ sealed trait RabbitMessage
 object RabbitPublisher {
   
   case class RabbitUserMessage(receiverUuid: String, provider: String, msg: JsValue) extends RabbitMessage
-  case class RabbitSystemMessage(appId:String, corrId: String, msg: ApiRequest) extends RabbitMessage
+  case class RabbitSystemMessage(appId:String, corrId: String, msg: Api.Request) extends RabbitMessage
 
   def props(channel: Channel, replyQueueName: String): Props = Props(new RabbitPublisher(channel, replyQueueName))
 }

@@ -54,11 +54,11 @@ class RabbitMqActor extends Actor with ActorLogging {
       if (null != ws) {
         log.debug("url {} received msg '{}'", ws.path, msg)
         // get the corrId for this socket..
-        val wsOp = upickle.read[WS.WebSocketOp](msg)
+        val wsOp = upickle.read[Socket.Op](msg)
         wsMap.get(ws) match{
           case Some(corrId) =>
             // TODO: this sux below => Json.parse( upickle.write(wsOp.data) )
-            val req = Api.ApiRequest(wsOp.module, wsOp.op, Api.ApiRoute(corrId,"",0L), upickle.write(wsOp.data) )
+            val req = Api.Request(wsOp.module, wsOp.op, upickle.write(wsOp.data), Api.Route(corrId,"",0L) )
             rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
           case None =>
             log.error("[ERROR] There is no corrId for this websocket")
@@ -81,7 +81,7 @@ class RabbitMqActor extends Actor with ActorLogging {
       val slotOp = path.tail.toString.split('/').toList
       slotOp match{
         case module :: op :: Nil =>
-          val req = Api.ApiRequest(module, op,Api.ApiRoute(corrId,"",0L), mq.data.toString)
+          val req = Api.Request(module, op, mq.data.toString, Api.Route(corrId,"",0L))
           rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
         case _ =>
           log.error(s"Invalid API request with path: $path")
