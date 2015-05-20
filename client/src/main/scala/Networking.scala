@@ -1,7 +1,6 @@
 package io.surfkit.client
 
 import io.surfkit.model._
-import io.surfkit.flux._
 //import japgolly.scalajs.react.vdom.all._
 import japgolly.scalajs.react.{ReactEventI, BackendScope, React, ReactComponentB}
 //import org.scalajs.dom
@@ -17,8 +16,6 @@ object Networking {
 
   //case class State(ipInfos : Seq[Auth.ProviderProfile])
   //class Backend
-
-
 
 }
 
@@ -54,7 +51,7 @@ class Networking {
   }
 
   def test(v:String) = {
-    val getFriends = upickle.write(WS.WebSocketOp("Auth","friends",Auth.GetFriends("APPID",1)))
+    val getFriends = upickle.write(io.surfkit.model.WebSocket.Op("Auth","friends",Auth.GetFriends("APPID",1)))
     ws.send(getFriends)
   }
 }

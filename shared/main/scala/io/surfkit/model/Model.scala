@@ -71,20 +71,29 @@ object Auth{
 
 }
 
-object WS{
-  case class WebSocketOp(module:String, op:String, data:Model) extends Model
+object Socket{
+  case class Op(module:String, op:String, data:Model) extends Model
 }
 
 
 object Api {
+  case class Route(id: String, reply: String, tag: Long) extends Model
+  case class Request(module: String, op: String, data: String, routing: Route)extends Model
 
-  case class ApiRoute(id: String, reply: String, tag: Long) extends Model
-  case class ApiRequest(module: String, op: String, routing: ApiRoute, data: String) extends Model
-  case class ApiResult(module: String, op: String, routing: ApiRoute, data: String) extends Model
+  case class Result(status: Int, module: String, op: String, data: String, routing: Route) extends Model
 
+  case class Error(msg:String) extends Model
 }
 
 
-case class SearchResult(id: String, title:String, description: String ) extends Model
+
+object Max {
+  case class Search(category:String, query:String, lat:Double, lng:Double, next: Option[String] = None) extends Model
+  case class SearchResult(id:String, api:String, title: String, details: String, highlights: String, url: String, img: String, tags:String, lat:Double = 0.0, lng: Double = 0.0) extends Model
+  case class SearchResultList(category: String, next:String, num:Int, pages:Int, results:List[SearchResult]) extends Model
+}
+
+
+
 
 
