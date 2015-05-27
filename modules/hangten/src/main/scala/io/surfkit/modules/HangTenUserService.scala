@@ -1,10 +1,11 @@
 package io.surfkit.modules
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorRef, ActorSystem}
 import akka.event.Logging
 import core.api.modules.SurfKitModule
 import io.surfkit.core.rabbitmq.RabbitDispatcher
 import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
+import io.surfkit.core.service.v1.UserActor
 import play.api.libs.json.Json
 import io.surfkit.model._
 
@@ -14,6 +15,9 @@ import scala.concurrent.Future
 object HangTenUserService extends App with SurfKitModule with UserGraph {
   implicit lazy val system = ActorSystem("hangten")
   println(s"System: $system")
+
+  var users:List[ActorRef] = Nil
+
   val logger = Logging(system, getClass)
 
   val db = HangTenSlick.db
@@ -80,6 +84,18 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           println(upickle.write[Seq[Auth.ProfileInfo]](jsArr))
           Api.Result(0, r.module, r.op, upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
       }
+
+    case g:Auth.CreateActor =>
+      println("CreateActor")
+      users = system.actorOf(UserActor.props(g.userId,g.channelId,rabbitUserDispatcher)) :: users
+      Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
+
+    case e:Auth.Echo =>
+      e.users.foreach( user =>
+        //println(s"Sending to user $user")
+        rabbitUserDispatcher ! RabbitDispatcher.SendUser(user,"appId",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
+      )
+      Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
   }
 
 
@@ -89,6 +105,8 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
       case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
       case "save" => actions(r)(upickle.read[Auth.ProviderProfile](r.data.toString))
       case "friends" => actions(r)(upickle.read[Auth.GetFriends](r.data.toString))
+      case "actor" => actions(r)(upickle.read[Auth.CreateActor](r.data.toString))
+      case "echo" => actions(r)(upickle.read[Auth.Echo](r.data.toString))
       case _ =>
         logger.error("Unknown operation.")
         Future.successful(Api.Result(1, r.module, r.op, upickle.write(Api.Error("Unknown operation.")), r.routing))
@@ -98,6 +116,11 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
   // Let's HangTen !
   val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
   rabbitDispatcher ! RabbitDispatcher.ConnectModule(mapper)  // connect to the MQ
+
+  // TODO: don't like the multiple dispatcher bit :(
+  val rabbitUserDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
+  rabbitUserDispatcher ! RabbitDispatcher.Connect  // connect to the MQ
+
 }
 
 

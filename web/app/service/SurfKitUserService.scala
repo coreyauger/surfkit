@@ -4,7 +4,7 @@ package service
  * Created by suroot on 04/05/15.
  */
 
-import io.surfkit.model.Auth
+import io.surfkit.model.{Api, Auth}
 import play.api.Play.current
 import scala.concurrent.ExecutionContext.Implicits.global
 import play.api.libs.json.Json
@@ -16,7 +16,6 @@ import scala.concurrent.Future
 import securesocial.core.services.{ UserService, SaveMode }
 
 import io.surfkit.model.Auth.{SurfKitUser, User, ProviderProfile}
-import io.surfkit.model.Api.{ApiRequest,ApiResult}
 
 import scala.util.Try
 
@@ -103,7 +102,7 @@ class SurfKitUserService extends UserService[User] {
     }
     WS.url(s"$surfkitEndpoint/auth/find").post( upickle.write(io.surfkit.model.Auth.FindUser("APPID",providerId,userId)) ).map{
       res =>
-        val apiRes = upickle.read[ApiResult](res.json.toString)
+        val apiRes = upickle.read[Api.Result](res.json.toString)
         ProfileImplicits.ProviderProfile2BasicProfile(Try(upickle.read[ProviderProfile](apiRes.data)).toOption)
     }
   }
@@ -132,7 +131,7 @@ class SurfKitUserService extends UserService[User] {
       res =>
         println(s"ret json: ${res.json}")
         // TODO: if userId return is zero then we failed to save ...
-        val apiRes = upickle.read[ApiResult](res.json.toString)
+        val apiRes = upickle.read[Api.Result](res.json.toString)
         val sr = upickle.read[io.surfkit.model.Auth.SaveResponse](apiRes.data)
         User(SurfKitUser(sr.userId, "token", user.fullName, user.avatarUrl, user.email), List[ProviderProfile]())
     }
