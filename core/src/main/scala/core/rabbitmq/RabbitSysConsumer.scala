@@ -22,8 +22,7 @@ class RabbitSysConsumer(val channel: Channel, val replyQueueName: String) extend
   import io.surfkit.core.rabbitmq.RabbitSysConsumer._
 
   private def initBindings(channel: Channel): Unit = {
-    channel.exchangeDeclare(sysExchange, "direct", true)
-
+    channel.exchangeDeclare(RabbitConfig.sysExchange, "direct", true)
     log.info(s"replyQueueName: $replyQueueName")
   }
 

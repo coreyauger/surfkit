@@ -45,6 +45,12 @@ class RabbitMqActor extends Actor with ActorLogging {
         //for (markerEntry <- markers if None != markerEntry._2)
         //  ws.send(message(markerEntry._2.get))
         log.debug("registered monitor for url {}", ws.path)
+        // CA - we send the connection to Auth to create or add to UserActor.
+        val uid = 1L // TODO: ... user id ??
+        val route = Api.Route(corrId,"",0L)
+        val newActor = Auth.CreateActor("appID",uid)
+        val req = Api.Request("auth", "actor", upickle.write(newActor), route)
+        rabbitDispatcher ! RabbitDispatcher.SendSys(req.module,"appID", corrId, req)
       }
     case WebSocket.Close(ws, code, reason) =>
       self ! RabbitMqActor.Unregister(ws)
@@ -59,7 +65,7 @@ class RabbitMqActor extends Actor with ActorLogging {
           case Some(corrId) =>
             // TODO: this sux below => Json.parse( upickle.write(wsOp.data) )
             val req = Api.Request(wsOp.module, wsOp.op, upickle.write(wsOp.data), Api.Route(corrId,"",0L) )
-            rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
+            rabbitDispatcher ! RabbitDispatcher.SendSys(req.module, "appID", corrId, req)
           case None =>
             log.error("[ERROR] There is no corrId for this websocket")
         }
@@ -71,6 +77,7 @@ class RabbitMqActor extends Actor with ActorLogging {
         wsResponders -= wsMap(ws)
         wsMap -= ws
         log.debug("unregister monitor")
+        // TODO: unregister from UserActor..
       }
     case mq @ RabbitMqActor.Mq(responder, path, data) =>
       log.debug("Mq {} '{}'", mq.path, mq.data)
@@ -82,7 +89,7 @@ class RabbitMqActor extends Actor with ActorLogging {
       slotOp match{
         case module :: op :: Nil =>
           val req = Api.Request(module, op, mq.data.toString, Api.Route(corrId,"",0L))
-          rabbitDispatcher ! RabbitDispatcher.SendSys("appID", corrId, req)
+          rabbitDispatcher ! RabbitDispatcher.SendSys(req.module, "appID", corrId, req)
         case _ =>
           log.error(s"Invalid API request with path: $path")
       }

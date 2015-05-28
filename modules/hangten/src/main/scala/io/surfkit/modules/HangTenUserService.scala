@@ -79,15 +79,12 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
     case g:Auth.GetFriends =>
       getUserFriends(g.userId).map{
         jsArr =>
-          print("#############################")
-          //println(jsArr)
-          println(upickle.write[Seq[Auth.ProfileInfo]](jsArr))
-          Api.Result(0, r.module, r.op, upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
+          Api.Result(0, r.module, r.op,  upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
       }
 
     case g:Auth.CreateActor =>
       println("CreateActor")
-      users = system.actorOf(UserActor.props(g.userId,g.channelId,rabbitUserDispatcher)) :: users
+      users = system.actorOf(UserActor.props(g.userId,r.routing,rabbitUserDispatcher)) :: users
       Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
 
     case e:Auth.Echo =>
@@ -112,10 +109,10 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
         Future.successful(Api.Result(1, r.module, r.op, upickle.write(Api.Error("Unknown operation.")), r.routing))
     }
   }
-
+  val module = "auth"
   // Let's HangTen !
   val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
-  rabbitDispatcher ! RabbitDispatcher.ConnectModule(mapper)  // connect to the MQ
+  rabbitDispatcher ! RabbitDispatcher.ConnectModule(module, mapper)  // connect to the MQ
 
   // TODO: don't like the multiple dispatcher bit :(
   val rabbitUserDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))

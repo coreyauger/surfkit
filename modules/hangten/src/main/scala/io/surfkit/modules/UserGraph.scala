@@ -314,12 +314,12 @@ trait UserGraph extends NeoService {
 
   }
 
-  def getUserFriendsQ(uid: Long, nodeId:Long = 0) = Q(s"""
+  def getUserFriendsQ(uid: Long, nodeId:Long = -1) = Q(s"""
           | MATCH (u:User {uid:{uid}})-[:MANAGES]->(r:Profile)-[:HAS_ACCOUNT]->(up:Provider)-[:FRIEND]->(p)
           | WHERE ID(p) > ${nodeId}
           | RETURN p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl, str(ID(p)) as node;
         """.stripMargin).use("uid" -> uid)
-  def getUserFriends(uid:Long, node:Long = 0) = getUserFriendsQ(uid, node).getMany[Auth.ProfileInfo]
+  def getUserFriends(uid:Long, node:Long = -1) = getUserFriendsQ(uid, node).getMany[Auth.ProfileInfo]
 
 
   def addFriendsForUser(uid:Long, provider:String, roster:List[Auth.ProfileInfo]) = {

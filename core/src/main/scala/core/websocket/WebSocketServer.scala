@@ -29,6 +29,7 @@ class WebSocketServer(val serverConnection: ActorRef, val route: Route) extends 
       handler = actor
       uripath = request.uri.path.toString
       println(s"Handler: $handler")
+      println(s"WS PATH: ${request.uri.path.toString}")
       handler ! WebSocket.Open(this)
     case Rejected(rejections) =>
       log.info("Rejecting with {}", rejections)

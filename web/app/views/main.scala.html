@@ -1,18 +1,22 @@
+@(userId:Long)
 <!DOCTYPE html>
 
 <html>
     <head>
         <title>SurfKit.io</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
         <link rel="stylesheet" href="assets/stylesheets/less/__main.css" >
     </head>
     <body>
         <h1>SurfKit.io</h1>
 
-        test
+        <h2>User @(userId)</h2>
         <button type="button" class="btn btn-default" aria-label="Left Align">
             <span class="glyphicon glyphicon-align-left" aria-hidden="true"></span>
         </button>
+
+
 
         <div id="content"></div>
 
@@ -20,12 +24,11 @@
         <script src="assets/lib/bootstrap/js/bootstrap.min.js"></script>
         <!-- script src="assets/lib/react/react.min.js"></script -->
         <script src="assets/lib/react/react.js"></script>
-        <script src="assets/javascripts/flux.js"></script>
 
         <script src="assets/javascripts/surfkit-client-fastopt.js"></script>
 
         <script type="text/javascript">
-            io.surfkit.client.HelloReact().main()
+            io.surfkit.client.SurfKitAppReact().run(@(userId))
         </script>
     </body>
 </html>

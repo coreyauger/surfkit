@@ -20,12 +20,12 @@ object RabbitModuleConsumer {
   lazy val sysExchange = RabbitConfig.sysExchange
 
 
-  def props(channel: Channel, mapper: (Api.Request) => Future[Api.Result]) =
-    Props(new RabbitModuleConsumer(channel, mapper))
+  def props(module:String, channel: Channel, mapper: (Api.Request) => Future[Api.Result]) =
+    Props(new RabbitModuleConsumer(module, channel, mapper))
 }
 
 
-class RabbitModuleConsumer(val channel: Channel, val mapper: (Api.Request) => Future[Api.Result]) extends ActorPublisher[Api.Request] with ActorLogging {
+class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper: (Api.Request) => Future[Api.Result]) extends ActorPublisher[Api.Request] with ActorLogging {
   import akka.stream.actor.ActorPublisherMessage._
   import io.surfkit.core.rabbitmq.RabbitModuleConsumer._
 
@@ -34,10 +34,14 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (Api.Request) => Fu
   val MaxBufferSize = 100
   var buf = Vector.empty[Api.Request]
 
+  val queue = s"$module"
+
   private def initBindings(channel: Channel): Unit = {
+    println(s"initBindings $sysExchange")
+    println(s"queue: $queue")
     channel.exchangeDeclare(sysExchange, "direct", true)
-    channel.queueDeclare(sysExchange, false, false, false, null)
-    channel.queueBind(sysExchange, sysExchange, sysExchange)
+    channel.queueDeclare(queue, false, false, false, null)
+    channel.queueBind(queue, sysExchange, queue)
     channel.basicQos(1)
   }
 
@@ -130,8 +134,9 @@ class RabbitModuleConsumer(val channel: Channel, val mapper: (Api.Request) => Fu
       initBindings(channel)
       log.info("SYS: initConsumer")
       val consumer = initConsumer(channel)
-      channel.basicConsume(RabbitModuleConsumer.sysExchange, true, consumer)
-      log.info(s"${self} started consuming from queue=$sysExchange")
+      //channel.basicConsume(RabbitModuleConsumer.sysExchange, true, consumer)
+      channel.basicConsume(queue, true, consumer)
+      log.info(s"${self} started consuming from queue=$queue")
       consumer
     }
   }

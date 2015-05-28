@@ -1,3 +1,35 @@
 @import "bootstrap/bootstrap";   // Import the original bootstrap less files
 @import "_variables";            // override any variables for bootstrap/variables
 @import "custom-styles";         // any custom styles we want to apply
+
+
+html{
+  body{
+
+    .chat-cnt{
+      position: fixed;
+      top: 0px;
+      right: 0px;
+      width: 200px;
+      bottom: 0px;
+      border-left: 1px solid #ccc;
+      .friend-list{
+        .tools{
+          padding: 5px;
+        }
+        .friend-card{
+          padding: 10px;
+          .avatar{
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            border: 2px solid white;
+          }
+          span{
+            margin-left: 10px;
+          }
+        }
+      }
+    }
+  }
+}

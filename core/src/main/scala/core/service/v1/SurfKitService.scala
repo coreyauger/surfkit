@@ -16,7 +16,7 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
       pathEndOrSingleSlash {
         getFromResource(dir + "index.html")
       } ~
-        path("ws") {
+        pathPrefix("ws") {
           requestUri { uri =>
             val wsUri = uri.withPort(Configuration.portWs)
             system.log.debug("redirect {} to {}", uri, wsUri)
@@ -39,7 +39,7 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
     }
   lazy val wsroute =
     pathPrefix("v1") {
-      path("ws") {
+      pathPrefix("ws") {
         implicit ctx =>
           ctx.responder ! WebSocket.Register(ctx.request, v1, true)
       }

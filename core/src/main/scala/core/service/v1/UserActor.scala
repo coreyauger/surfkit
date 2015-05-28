@@ -17,7 +17,7 @@ import io.surfkit.core.rabbitmq.{RabbitDispatcher, RabbitUserConsumer}
 import scala.util.{Failure, Success}
 
 
-class UserActor(uid: Long, channelId:String, rabbitDispatcher: ActorRef) extends Actor with ActorLogging{
+class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) extends Actor with ActorLogging{
 
   log.info(s"UserActor create: $uid")
 
@@ -64,7 +64,7 @@ class UserActor(uid: Long, channelId:String, rabbitDispatcher: ActorRef) extends
   def pushToConnectedChannels(res:Api.Result) = channels.foreach(
     channel =>
       // No CorrId .. just a reply key (which is the id of the socket)
-      socketChannel ! Api.Result(res.status, res.module, res.op, res.data, Api.Route(channel,channel,0L) )
+      socketChannel ! Api.Result(res.status, res.module, res.op, res.data, channel )
     )
 
   /*
@@ -195,7 +195,7 @@ class UserActor(uid: Long, channelId:String, rabbitDispatcher: ActorRef) extends
       }
       */
     case r:Auth.Echo =>
-      pushToConnectedChannels(Api.Result(0, "user","echo",upickle.write(r),Api.Route("","",0L)))
+      pushToConnectedChannels(Api.Result(0, "User","echo",upickle.write(r),channelId))
 
 
     case r:Auth.AbsorbActorReq =>
@@ -206,7 +206,7 @@ class UserActor(uid: Long, channelId:String, rabbitDispatcher: ActorRef) extends
         println("Sending AbsorbActorRes RabbitDispatcher...")
         rabbitDispatcher ! RabbitDispatcher.SendUser(uid,"appId",req)
         // now we can shut down.. since there should only be one user actor.
-        self ! Kill
+        context.stop(self)
       }else {
         // Note that if the channel id was the same.. we do nothing..
         println("AbsorbActorReq from self...")
@@ -246,7 +246,7 @@ class UserActor(uid: Long, channelId:String, rabbitDispatcher: ActorRef) extends
 
 object UserActor{
 
-  def props(uuid: Long, channelId:String, rabbitDispatcher: ActorRef) =
+  def props(uuid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) =
     Props(new UserActor(uuid,channelId, rabbitDispatcher))
 
   /*

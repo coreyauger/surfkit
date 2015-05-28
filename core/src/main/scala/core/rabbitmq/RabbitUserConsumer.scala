@@ -1,5 +1,7 @@
 package io.surfkit.core.rabbitmq
 
+import io.surfkit.model.Api
+
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.util.ByteString
@@ -16,12 +18,12 @@ object RabbitUserConsumer {
   
   case class RabbitMessage(deliveryTag: Long, headers: Map[String, String], body: ByteString)
   
-  def props(userId: String, userActor: ActorRef)(implicit connection: Connection) = 
+  def props(userId: Long, userActor: ActorRef)(implicit connection: Connection) =
     Props(new RabbitUserConsumer(userId, userActor))
 }
 
 
-class RabbitUserConsumer(userId: String, userActor: ActorRef)(implicit connection: Connection) extends Actor with ActorLogging {
+class RabbitUserConsumer(userId: Long, userActor: ActorRef)(implicit connection: Connection) extends Actor with ActorLogging {
   
   import io.surfkit.core.rabbitmq.RabbitUserConsumer._
   
@@ -48,12 +50,24 @@ class RabbitUserConsumer(userId: String, userActor: ActorRef)(implicit connectio
   
   var channel: Channel = null
   var consumer: DefaultConsumer = null
-  
       
   override def receive = {
     case msg: RabbitUserConsumer.RabbitMessage =>
       log.debug(s"received msg with deliveryTag ${msg.deliveryTag}")
       userActor ! msg
+
+      // This pushes data back into rabbit that will go down the web socket connections to the user.
+    case ret:Api.Result =>
+      val replyProps = new AMQP.BasicProperties
+      .Builder()
+        .correlationId(ret.routing.id)
+        .build()
+      println("In RabbitUserConsumer Result...")
+      println(ret.op)
+      println(s"replyTo: ${ret.routing.reply}")
+      println(s"ret.routing.id, ${ret.routing.id}")
+      // TODO: looks like i need a NAMED socket queue here... check into this more.
+      channel.basicPublish( "", ret.routing.reply, replyProps, upickle.write( ret ).getBytes )
   }
   
   override def preStart() = {

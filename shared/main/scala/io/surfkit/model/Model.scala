@@ -1,10 +1,16 @@
 package io.surfkit.model
 
+import io.surfkit.model.Auth.UserID
+
 sealed trait Model
 
 
 // Model for HangTen (Auth) Module
 object Auth{
+
+  case class UserID(userId: Long) extends AnyVal {
+    override def toString = userId.toString
+  }
 
   case class SurfKitUser(id:Long, token:String, fullName:Option[String], avatarUrl: Option[String], email:Option[String]) extends Model
 
@@ -52,6 +58,11 @@ object Auth{
                               passwordInfo: Option[PasswordInfo] = None) extends GenericProfile
 
 
+  case class CreateActor(appId: String, userId:Long ) extends Model
+  case class AbsorbActorReq(channelId:Api.Route)extends Model
+  case class AbsorbActorRes(channels:List[Api.Route])extends Model
+  case class Echo(msg:String, users:List[Long]) extends  Model
+
   case class FindUser(appId: String, providerId:String, userId:String) extends Model
   case class GetFriends(appId: String, userId:Long ) extends Model
   case class SaveResponse(userId: Long) extends Model
@@ -70,6 +81,63 @@ object Auth{
   case class ProfileInfo(provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String)
 
 }
+
+
+
+
+object Chat {
+
+  case class ChatID(chatId: Long) extends AnyVal {
+    override def toString = chatId.toString
+  }
+
+  sealed trait ChatMsg extends Model
+  case class CreateGroup(name: String, permission: Short, members: List[String]) extends ChatMsg
+  case class ChatPresence(jid: String, status: String) extends ChatMsg
+  case class GetChatList(uid:UserID, since: String) extends ChatMsg
+  case class GetHistory(chatId: ChatID, maxId: Option[Long], offset: Option[Long]) extends ChatMsg
+  case class GetMembers(chatId: ChatID) extends ChatMsg
+  case class GetUserGroups() extends ChatMsg
+  case class MemberJoin(chatId: ChatID, memberId: String) extends ChatMsg
+  case class ReceiveChatMsg(userId:UserID,
+                            chatId: Option[ChatID],
+                            author: String,
+                            time: String,
+                            msg: String,
+                            recipient: Option[String],
+                            owner: Option[String]) extends ChatMsg
+  case class SetChatOrGroupName(chatId: ChatID, name: String) extends ChatMsg
+
+
+  //
+  case class ChatMembers(chatId:ChatID, members:Seq[Auth.ProfileInfo]) extends ChatMsg
+
+}
+
+
+
+object Providers {
+
+  sealed trait Provider extends Model{
+    def name: String
+    def idx: Int
+  }
+  case object Walkabout extends Provider{
+    val name = "walkabout"
+    val idx  = 0
+  }
+  case object Facebook extends Provider{
+    val name = "facebook"
+    val idx  = 1
+  }
+  case object Google extends Provider{
+    val name = "google"
+    val idx  = 2
+  }
+}
+
+
+
 
 object Socket{
   case class Op(module:String, op:String, data:Model) extends Model

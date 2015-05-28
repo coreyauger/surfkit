@@ -5,14 +5,13 @@ import io.surfkit.model._
 import scala.collection.JavaConversions._
 import akka.actor.{Actor, ActorLogging, Props}
 import com.rabbitmq.client.{QueueingConsumer, AMQP, Channel}
-import play.api.libs.json._
 
 sealed trait RabbitMessage
 
 object RabbitPublisher {
   
-  case class RabbitUserMessage(receiverUuid: String, provider: String, msg: JsValue) extends RabbitMessage
-  case class RabbitSystemMessage(appId:String, corrId: String, msg: Api.Request) extends RabbitMessage
+  case class RabbitUserMessage(receiverUid: Long, appId: String, msg: Api.Request) extends RabbitMessage
+  case class RabbitSystemMessage(module:String, appId:String, corrId: String, msg: Api.Request) extends RabbitMessage
 
   def props(channel: Channel, replyQueueName: String): Props = Props(new RabbitPublisher(channel, replyQueueName))
 }
@@ -25,18 +24,19 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
   channel.exchangeDeclare(RabbitConfig.sysExchange, "direct", true)
 
   override def receive = {
-    case RabbitUserMessage(userId, provider, msg) =>
+    case RabbitUserMessage(userId, appId, msg) =>
+      println("RabbitUserMessage")
       val routingKey = s"${RabbitConfig.userExchange}.$userId"
-      val headers = Map("uid" -> userId, "provider" -> provider)
-      log.debug(s"RabbitUserMessage($userId, $provider, $msg)")
+      val headers = Map("uid" -> userId.toString)
+      log.debug(s"RabbitUserMessage($userId, $appId, $msg)")
       channel.basicPublish(
         RabbitConfig.userExchange, 
         routingKey, 
-        new AMQP.BasicProperties.Builder().headers(headers).build(), 
-        msg.toString().getBytes()
+        new AMQP.BasicProperties.Builder().headers(headers).build(),
+        upickle.write(msg).getBytes()
       )
 
-    case RabbitSystemMessage(appId, corrId, msg) =>
+    case RabbitSystemMessage(module, appId, corrId, msg) =>
       //val routingKey = s"${RabbitConfig.sysExchange}.$appId"
       val headers = Map("aid" -> appId)
       val props = new AMQP.BasicProperties
@@ -49,7 +49,7 @@ class RabbitPublisher(channel: Channel, replyQueueName: String) extends Actor wi
       log.debug(s"RabbitSystemMessage($appId, $msg) corrId: $corrId  reply -> $replyQueueName")
       channel.basicPublish(
         RabbitConfig.sysExchange,
-        RabbitConfig.sysExchange,  // no routing key
+        module,  // routing key
         //new AMQP.BasicProperties.Builder().headers(headers).build(),
         props,
         upickle.write(msg).getBytes()
