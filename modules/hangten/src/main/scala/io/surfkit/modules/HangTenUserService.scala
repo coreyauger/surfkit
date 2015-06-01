@@ -17,24 +17,9 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
   println(s"System: $system")
 
   var users:List[ActorRef] = Nil
-
   val logger = Logging(system, getClass)
-
   val db = HangTenSlick.db
-  import io.surfkit.model.Auth._
-  implicit val pir    = Json.reads[Auth.PasswordInfo]
-  implicit val piw    = Json.writes[Auth.PasswordInfo]
-  implicit val oa1r   = Json.reads[Auth.OAuth1Info]
-  implicit val oa1w   = Json.writes[Auth.OAuth1Info]
-  implicit val oa2r   = Json.reads[Auth.OAuth2Info]
-  implicit val oa2w   = Json.writes[Auth.OAuth2Info]
-  implicit val amr    = Json.reads[Auth.AuthenticationMethod]
-  implicit val amw    = Json.writes[Auth.AuthenticationMethod]
-  implicit val pr     = Json.reads[Auth.ProviderProfile]
-  implicit val pw     = Json.writes[Auth.ProviderProfile]
-  implicit val raf    = Json.reads[Auth.FindUser]
-  implicit val rff    = Json.reads[Auth.GetFriends]
-  implicit val wsr    = Json.writes[Auth.SaveResponse]
+
 
   def actions(r:Api.Request): PartialFunction[Model, Future[Api.Result]] = {
     case Auth.FindUser(appId:String, providerId: String, userId: String) =>
@@ -57,7 +42,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           println(s"LENGTH: ${pro.length}")
           // TODO: write an update
           val h = pro.head
-          addFriendsToGraph(h.userKey, p)
+          addFriendsToGraph(p.appId, h.userKey, p)
           Future.successful( Api.Result(0,r.module, r.op, upickle.write(Auth.SaveResponse(pro.head.id)), r.routing))
       }.recoverWith {
         case _ =>
@@ -67,7 +52,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
               saveUserGraph(id,p).onSuccess{
                 case _ =>
                   // try to import friends for this provider
-                  addFriendsToGraph(id, p)
+                  addFriendsToGraph(p.appId, id, p)
               }
               Api.Result(0, r.module, r.op, upickle.write(Auth.SaveResponse(id)), r.routing )
           }.recover {

@@ -13,7 +13,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import io.surfkit.model._
 
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 trait UserGraph extends NeoService {
 
@@ -56,16 +56,16 @@ trait UserGraph extends NeoService {
   }
 
 
-  def connectFriendQ(uid: Long, friendUuid: Long) =
+  def connectFriendQ(provider: String, uid: Long, friendUuid: Long) =
     Q(
       """
-        |MATCH (f:User {uid:{friendUuid}})-[:HAS_ACCOUNT]->(fp:Provider {name:'walkabout'}),
-        |      (u:User {uid:{uid}})-[:HAS_ACCOUNT]->(p:Provider {name:'walkabout'})
+        |MATCH (f:User {uid:{friendUuid}})-[:HAS_ACCOUNT]->(fp:Provider {name:{provider}}),
+        |      (u:User {uid:{uid}})-[:HAS_ACCOUNT]->(p:Provider {name:{provider}})
         |CREATE UNIQUE
         | (fp)-[:FRIEND]->(p)-[:FRIEND]->(fp)
         |RETURN fp;
       """
-    ).use("uid" -> uid, "friendUuid" -> friendUuid)
+    ).use("uid" -> uid, "friendUuid" -> friendUuid, "provider" -> provider)
 
 
   def createAndConnectDeviceQ(uid: Long, deviceID: String, deviceType: String) =
@@ -88,34 +88,31 @@ trait UserGraph extends NeoService {
 
 
   def mergeFriends(uid: Long, friends: Seq[JsObject], provider: String) = {
-  // (CA) - right now add the provider to ALL profiles of that user..
-    println(s"PROPS: $friends")
-    Q(
-      """
+    println(s"PROPS: $friends, provider: $provider")
+    Q("""
         MATCH (u: User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(pu:Provider)
         WHERE u.uid = {uid} AND pu.name = {provider}
         FOREACH (p in {props} |
           MERGE (f:Provider {name: p.name, jid: p.jid, id: p.id})
-          ON CREATE SET f = p
-        CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
+          CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
         RETURN u
-      """).use("uid" -> uid.toString, "provider" -> provider, "props" -> friends).run(
-      )
+      """).use("uid" -> uid, "provider" -> provider, "props" -> friends).run()
     }
 
-  def addAppFriends(appId: String, uid: Long, jids: Seq[String], providerLink: Option[String]) =
-    Q("""
-      MATCH (u1:User {uid: {uid}})-[:HAS_ACCOUNT]->(w1:Provider {name:{appId}}),
-            (p:Provider)<-[:HAS_ACCOUNT]-(friend:User)-[:HAS_ACCOUNT]->(w2:Provider {name:{appId}})
-      OPTIONAL MATCH (po: Provider)
-      WHERE p.jid in {jids}
-      AND po.jid = {providerLink}
-      CREATE UNIQUE
-         (w1)-[:FRIEND]->(w2)-[:FRIEND]->(w1)
-      CREATE UNIQUE
-        (po)-[:FRIEND]->(p)-[:FRIEND]->(po)
-      RETURN w2;
-      """).use("appId" -> appId, "uid" -> uid.toString, "jids" -> jids, "providerLink" -> providerLink.getOrElse[String]("-1")).getManyJs
+  def addAppFriends(appId: String, uid: Long, jids: Seq[String]) = {
+    println(s"$appId, $uid, $jids")
+    Q(
+      """
+        |MATCH (u1:User {uid: {uid}})-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(w1:Provider {name:{appId}}),
+        |(friend:User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(w2:Provider {name:{appId}})
+        |MATCH (friend:User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(p:Provider)
+        |WHERE p.jid in {jids}
+        |CREATE UNIQUE
+        |(w1)-[:FRIEND]->(w2)-[:FRIEND]->(w1)
+        |RETURN w2;
+      """).use("appId" -> appId, "uid" -> uid, "jids" -> jids).
+      getManyJs
+    }
 
 
 
@@ -245,7 +242,7 @@ trait UserGraph extends NeoService {
                             | MATCH (r:Profile {id: {profile}})
                             | CREATE UNIQUE (r)-[:HAS_ACCOUNT]->(p:Provider
                             | {
-                            |  name: "{appId}",
+                            |  name: {appId},
                             |  id : {uid},
                             |  jid: {waJid},
                             |  firstName: {firstName},
@@ -322,39 +319,36 @@ trait UserGraph extends NeoService {
   def getUserFriends(uid:Long, node:Long = -1) = getUserFriendsQ(uid, node).getMany[Auth.ProfileInfo]
 
 
-  def addFriendsForUser(uid:Long, provider:String, roster:List[Auth.ProfileInfo]) = {
-    //val roster = (json \ "data" \ "roster").as[List[JsValue]]
-    // TODO: fix error seen in log "head of empty list "
-    //val provider = (json \ "data" \ "roster" \\ "provider").head.as[String]
-    //val providerLink = (json \ "data" \ "link").as[Option[String]]
-
-
+  def addFriendsForUser(appId:String, uid:Long, provider:String, roster:List[Auth.ProfileInfo]) = {
     val t1 = new Date().getTime()
     getUserFriends(uid, 0).onSuccess {
       case friends:List[Auth.ProfileInfo] =>
         val friendMap = friends.map(f => (f.jid, f)).toMap
 
         val toAdd: List[JsObject] = roster.filterNot(f => friendMap.contains(f.jid)).map(c =>Json.obj("name" -> provider, "jid" -> c.jid, "id" -> c.id, "fullName" -> c.fullName, "avatarUrl" -> c.avatarUrl, "email" -> c.email))
-        mergeFriends(uid, toAdd, provider).onSuccess { case _ =>
-          //userActor ! JsonRequest("friends-friends", Json.obj("op" -> "friends", "slot" -> "friends", "data" -> Json.obj("uuid" -> uuid)));
-          // TODO:  ...
-          //addAppFriends(uid, toAdd.map(f => (f \ "jid").as[String]), providerLink).onFailure { case e =>
-          //  e.printStackTrace()
-          //}
+        println("***********************")
+        println(s"toAdd $toAdd")
+        mergeFriends(uid, toAdd, provider).onComplete{
+          case Failure(e) => println(e)
+          case Success(ret) =>
+          println(s"RET: $ret")
+          addAppFriends(appId, uid, toAdd.map(f => (f \ "jid").as[String])).onFailure { case e =>
+            e.printStackTrace()
+          }
           println("set roster took " + (new Date().getTime() - t1) + " ms for " + toAdd.size + " friends")
         }
     }
   }
 
 
-  def addFriendsToGraph(uid:Long, user:Auth.ProviderProfile) =
+  def addFriendsToGraph(appId:String, uid:Long, user:Auth.ProviderProfile) =
     user.providerId match{
       case "facebook" =>
         println(s"https://graph.facebook.com/v2.3/me/friends?access_token=${user.oAuth2Info.map(o => o.accessToken).get}")
         ws.url(s"https://graph.facebook.com/v2.3/me/friends?access_token=${user.oAuth2Info.map(o => o.accessToken).getOrElse("")}").get().map{
         resp =>
           val flist = (resp.json \ "data").as[List[JsValue]]
-          addFriendsForUser(uid, "facebook", flist.map(f => Auth.ProfileInfo("facebook", (f \ "id").as[String], (f \ "name").as[String], "", s"${(f \ "id").as[String]}@chat.facebook.com", s"http://graph.facebook.com/${(f \ "id").as[String]}/picture?type=square")))
+          addFriendsForUser(appId, uid, "facebook", flist.map(f => Auth.ProfileInfo("facebook", (f \ "id").as[String], (f \ "name").as[String], "", s"${(f \ "id").as[String]}@chat.facebook.com", s"http://graph.facebook.com/${(f \ "id").as[String]}/picture?type=square")))
       }
     }
 
