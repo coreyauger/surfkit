@@ -99,19 +99,18 @@ object Chat {
   case class GetMembers(chatId: ChatID) extends ChatMsg
   case class GetUserGroups() extends ChatMsg
   case class MemberJoin(chatId: ChatID, memberId: String) extends ChatMsg
-  case class ReceiveChatMsg(userId:UserID,
-                            chatId: Option[ChatID],
+  case class ChatSend(userId:UserID,
+                            chatId: ChatID,
                             author: String,
                             time: String,
-                            msg: String,
-                            recipient: Option[String],
-                            owner: Option[String]) extends ChatMsg
+                            msg: String) extends ChatMsg
+  case class ChatCreate(userId:UserID,members: List[String]) extends ChatMsg
   case class SetChatOrGroupName(chatId: ChatID, name: String) extends ChatMsg
 
 
   //
-  case class ChatMembers(chatId:ChatID, members:Seq[Auth.ProfileInfo]) extends ChatMsg
-
+  case class ChatEntry(chatid:Long, chatentryid:Long, from:String, timestamp:Long, provider:Short, json:String) extends ChatMsg
+  case class Chat(chatid:Long, members:Seq[Auth.ProfileInfo], entries:Seq[ChatEntry]) extends ChatMsg
 }
 
 

@@ -30,7 +30,8 @@ trait UserGraph extends NeoService {
 
 
   import io.surfkit.model.Auth.ProfileInfo
-  implicit val profR = Json.format[Auth.ProfileInfo]
+  implicit val profR = Json.reads[Auth.ProfileInfo]
+  implicit val profW = Json.writes[Auth.ProfileInfo]
 
   //We provide xxxQ for the rest of the world so they can make transactions just by apppending Qs
 
@@ -243,7 +244,7 @@ trait UserGraph extends NeoService {
                             | CREATE UNIQUE (r)-[:HAS_ACCOUNT]->(p:Provider
                             | {
                             |  name: {appId},
-                            |  id : {uid},
+                            |  id : STR({uid}),
                             |  jid: {waJid},
                             |  firstName: {firstName},
                             |  lastName: {lastName},
@@ -324,10 +325,7 @@ trait UserGraph extends NeoService {
     getUserFriends(uid, 0).onSuccess {
       case friends:List[Auth.ProfileInfo] =>
         val friendMap = friends.map(f => (f.jid, f)).toMap
-
-        val toAdd: List[JsObject] = roster.filterNot(f => friendMap.contains(f.jid)).map(c =>Json.obj("name" -> provider, "jid" -> c.jid, "id" -> c.id, "fullName" -> c.fullName, "avatarUrl" -> c.avatarUrl, "email" -> c.email))
-        println("***********************")
-        println(s"toAdd $toAdd")
+        val toAdd: List[JsObject] = roster.filterNot(f => friendMap.contains(f.jid)).map(c =>Json.obj("name" -> provider, "jid" -> c.jid, "id" -> c.id.toString, "fullName" -> c.fullName, "avatarUrl" -> c.avatarUrl, "email" -> c.email))
         mergeFriends(uid, toAdd, provider).onComplete{
           case Failure(e) => println(e)
           case Success(ret) =>

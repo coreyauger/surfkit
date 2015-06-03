@@ -6,7 +6,7 @@ import java.util.TimeZone
 import akka.actor._
 import akka.pattern.ask
 import akka.util.Timeout
-import io.surfkit.model.{Api, Auth}
+import io.surfkit.model.{Chat, Api, Auth}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.rabbitmq.client.Connection
@@ -61,11 +61,12 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
   startConsumer()
 
   // This pushes data back into rabbit that will go down the web socket connections to the user.
-  def pushToConnectedChannels(res:Api.Result) = channels.foreach(
+  def pushToConnectedChannels(res:Api.Result) = channels.foreach {
     channel =>
       // No CorrId .. just a reply key (which is the id of the socket)
-      socketChannel ! Api.Result(res.status, res.module, res.op, res.data, channel )
-    )
+      println(s"Sending down channel $channel")
+      socketChannel ! Api.Result(res.status, res.module, res.op, res.data, channel)
+  }
 
   /*
   val defaultProviders = List[(String, () => ActorRef)](
@@ -197,6 +198,9 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
     case r:Auth.Echo =>
       pushToConnectedChannels(Api.Result(0, "User","echo",upickle.write(r),channelId))
 
+    case a:Api.Request =>
+      println("User Actor push to channels")
+      pushToConnectedChannels(Api.Result(0, "user",s"${a.module}-${a.op}",a.data,channelId))
 
     case r:Auth.AbsorbActorReq =>
       if( r.channelId != channelId ){
@@ -227,6 +231,7 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
         case "register" => self ! upickle.read[Auth.AbsorbActorReq](apiReq.data)
         case "channels" => self ! upickle.read[Auth.AbsorbActorRes](apiReq.data)
         case "echo" => self ! upickle.read[Auth.Echo](apiReq.data)
+        case _ => self ! apiReq
       }
       /*
       chatProviders.get(provider) match {

@@ -4,11 +4,12 @@ import com.ning.http.client.AsyncHttpClientConfig
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.functional.syntax._
 import play.api.libs.json.Json.JsValueWrapper
-import play.api.libs.json.{JsArray, JsObject, JsPath, JsString, JsValue, Json, Reads}
+import play.api.libs.json._
 import play.api.libs.ws.{DefaultWSClientConfig, WS}
 import play.api.libs.ws.ning.{NingWSClient, NingAsyncHttpClientConfigBuilder}
 
 import scala.concurrent.Future
+import scala.util.Try
 
 trait NeoService {
 
@@ -40,7 +41,8 @@ trait NeoService {
 
     def use(params: (String, JsValueWrapper)*): Q = Q(q, Json.obj(params: _*))
 
-    def getSingle[T](column: String)(implicit neoServer:Neo4JServer, reader: Reads[T]) = neoPost.map( l => (l.head \ column).as[T])
+    def getSingle[T](column: String)(implicit neoServer:Neo4JServer, reader: Reads[T]) = neoPost.map(l => (l.head \ column).as[T])
+
 
     def getMultiple[T](column: String)(implicit neoServer:Neo4JServer, reader: Reads[T]) = neoPost.map(l => l.map(js => (js \ column).as[T]))
 
@@ -53,8 +55,18 @@ trait NeoService {
     def getManyJs(implicit neoServer:Neo4JServer): Future[JsArray] = neoPost.map(JsArray)
 
     def getMany[T](implicit neoServer:Neo4JServer, r: Reads[T]): Future[Seq[T]] = neoPost.map { results =>
+      /*
       println(results)
+      println(s"READS $r")
+      try{
+        results.map{a => println(a);a.as[T]}
+      } catch{
+        case t => println(t)
+      }
+      */
       results.map(_.as[T])
+
+
     }
 
     def run()(implicit neoServer:Neo4JServer) = neoPost
@@ -80,29 +92,38 @@ trait NeoService {
     * Neo4j always use http 200 or 201 code. So no 40x for errors, we need to inspect the json "errors" field
     */
     private def neoPost()(implicit neoServer:Neo4JServer): Future[Seq[JsObject]] = {
+      //println(Json.obj("statements" -> Json.arr(
+      //  Json.obj("statement" -> q.stripMargin, "parameters" -> params))
+      //))
       ws.url(neoServer.url("transaction/commit"))
-        .withHeaders( ("Accept","application/json; charset=UTF-8"), ("Content-Type", "application/json") )
+        .withHeaders(("Accept", "application/json; charset=UTF-8"), ("Content-Type", "application/json"))
         .post(Json.obj("statements" -> Json.arr(
-          Json.obj("statement" -> q.stripMargin, "parameters" -> params))
-        ))
-        .map { res =>
-          val errors = (res.json \ "errors").as[Seq[ResultError]]
-          val results = (res.json \ "results")(0)
-          val values = (results \\ "row").map(_.as[Seq[JsValue]])
-          (errors, values) match {
-            case (err, _) if !err.isEmpty => throw Neo4PlayException(s"neo4j exception: ${errors.head.message} - ${errors.head.code}")
-            case (_, rows) if rows.isEmpty => Seq.empty
-            case _ => parseResult(values, res.json)
-          }
+        Json.obj("statement" -> q.stripMargin, "parameters" -> params))
+      )).map { res =>
+        val errors = (res.json \ "errors").as[Seq[ResultError]]
+        val results = (res.json \ "results")(0)
+        val values = (results \\ "row").map(_.as[Seq[JsValue]]).filter(_ != JsNull)
+        (errors, values) match {
+          case (err, _) if !err.isEmpty => throw Neo4PlayException(s"neo4j exception: ${errors.head.message} - ${errors.head.code}")
+          case (_, rows) if rows.isEmpty => Seq.empty
+          case _ => parseResult(values, res.json)
         }
+      }
+
     }
 
     private def parseResult(values: Seq[Seq[JsValue]], json: JsValue) = {
+      println(s"values $values")
+      println(s"json $json")
       val results = (json \ "results")(0)
       val cols = (results \ "columns").as[Seq[String]]
       values.head.head match {
         case str: JsString => values.map(row => JsObject(cols.zip(row)))
-
+        case num: JsNumber =>
+          println(s"values: ${values.map(row => JsObject(cols.zip(row)))}")
+          val ls:List[JsObject] = values.map(row => JsObject(cols.zip(row))).toList
+          //val vv = (values.map(row => JsObject(cols.zip(row)))).map( l => (l.head \ column)
+          values.map(row => JsObject(cols.zip(row)))
         case obj: JsObject => values.map { row =>
           if(row.size > 1)
             throw Neo4PlayException(s"Cannot parse multi node RETURN. $q")

@@ -18,7 +18,7 @@ trait PostgresService {
   dateFormatUtc.setTimeZone(TimeZone.getTimeZone("UTC"))
 
 
-  private val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/walkabout?user=postgres&password=Neverdull42")
+  private val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/sktest?user=postgres&password=Neverdull42")
   private val factory = new PostgreSQLConnectionFactory( configuration )
 
   @implicitNotFound(
@@ -33,8 +33,6 @@ trait PostgresService {
       def reads(row: RowData) = f(row)
     }
   }
-
-  trait DbObject
 
   def dateTimeStr( date: Date = new Date() ) = dateFormatUtc.format(date)
 
@@ -79,6 +77,10 @@ trait PostgresService {
 
       def getRows[T](implicit reader: RowReader[T]): Future[Seq[T]] = postgresRow.map(l => l.map(reader.reads))
 
+      def sendCreateSchemaQuery() = {
+        val conn = factory.create
+        conn.sendQuery(q.stripMargin)
+      }
       private def postgresExec[T](transformer: (QueryResult) => T): Future[T] = {
         val conn = factory.create
         conn.sendPreparedStatement(q.stripMargin, params).map { (r) =>

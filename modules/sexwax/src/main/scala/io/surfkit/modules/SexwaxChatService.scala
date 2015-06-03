@@ -1,6 +1,6 @@
 package io.surfkit.modules
 
-import java.util.{Calendar, GregorianCalendar}
+import java.util.{Date, Calendar, GregorianCalendar}
 
 import akka.actor.ActorSystem
 import akka.event.Logging
@@ -8,7 +8,7 @@ import core.api.modules.SurfKitModule
 import io.surfkit.core.rabbitmq.RabbitDispatcher
 import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import io.surfkit.model.Auth.UserID
-import io.surfkit.model.Chat.ChatID
+import io.surfkit.model.Chat.{ChatEntry, ChatID}
 import io.surfkit.model._
 import io.surfkit.model._
 import play.api.libs.json._
@@ -27,10 +27,32 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
 
 
 
+  def createOrGetChatId(uid:UserID, jid:String, members:Set[String]):Future[ChatID] = {
+    // TODO: check cache ?
+    findChat(members).map(_.headOption.map(c => ChatID(c))).flatMap{
+      case Some(cid) =>
+        println(s"found some($cid)")
+        Future.successful( cid )
+      case _ =>
+        println("createChat")
+        createChat(uid.userId).map { newchatId =>
+          createChatNode(newchatId, uid, members).onFailure { case e:Throwable =>
+            //user ! MessageProcessError(Json.obj("msg" -> e.getMessage()))
+            println("ERROR....")
+            logger.error(s"$e")
+          }
+          println(s"NEW CHAT ID: $newchatId")
+          rooms += newchatId -> members
+          // TODO: store cached state in redis ?
+          newchatId
+        }
+    }
+
+  }
 
 
 
-  def sendMessage(chatId:ChatID, m:Chat.ReceiveChatMsg) ={
+  def sendMessage(m:Chat.ChatSend) ={
 
   }
 
@@ -64,8 +86,8 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
     case Chat.GetMembers(chatId) =>
       getMembersDetails(chatId.toString) map {
         members =>
-          val chat = Chat.ChatMembers(chatId,members)
-          Api.Result(0, r.module, r.op,  upickle.write[Chat.ChatMembers](chat), r.routing)
+          val chat = Chat.Chat(chatId.chatId,members, Nil)
+          Api.Result(0, r.module, r.op,  upickle.write[Chat.Chat](chat), r.routing)
       }
 
       /*
@@ -79,57 +101,39 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
           Api.Result(0, r.module, r.op,  "", r.routing)
       }
 
-
       /*
     case Chat.SetChatOrGroupName(chatId, name) =>
       setChatOrGroupName(chatId,name)
     */
 
-
-    //will probably need to get rid of the useless json transformation for chat msgs.
-    //will see after ChatRoom is OK. It may need some typed data
-    case m @ Chat.ReceiveChatMsg(userId, mbChatId, author, time, msg, mbRecipient, mbOwner) =>
-      def amIOwner(ownerId: UserID) = userId == ownerId
-      //user ! Json.toJson(m) //direct response. User is always concerned by this msg
-
-      //guess chatId if not there
-      val mbRetrievedChat = mbChatId match {
-        case Some(c) => Future(Some(c))
-        case None    => find2WayChat(author, mbRecipient.get).map(_.headOption.map(c => ChatID(c.toLong)))
+    case Chat.ChatCreate(userId, members) => {
+      println("ChatCreate")
+      val jid = s"$userId@APPID"
+      val memberSet = (jid :: members).toSet
+      createOrGetChatId(userId,jid,memberSet).map{
+        chatId =>
+          Api.Result(0, r.module, r.op,  upickle.write(Chat.Chat(chatId.chatId, Nil, Nil)), r.routing)
       }
-      mbRetrievedChat.flatMap {
+    }
 
-        //chatId is undefined and no chat between author and recipient as been find in DB.
-        case None =>
-          val mbAuthor = if(author == userId.toString) None else Some(author)
-          val members = Set(Some(userId.toString), mbAuthor, mbRecipient).flatten
-          val owner = userId
-          createChat(userId.userId).map { newchatId =>
-            createChatNode(newchatId, userId.toString, members).onFailure { case e:Throwable =>
-              //user ! MessageProcessError(Json.obj("msg" -> e.getMessage()))
-              logger.error(s"$e")
-            }
-            rooms += newchatId -> members
-            // TODO: store cached state in redis ?
-            sendMessage(newchatId, m)
-            Api.Result(0, r.module, r.op,  "", r.routing)
+
+    case m @ Chat.ChatSend(userId, chatId, author, time, msg) => {
+      val provider = Providers.Walkabout // TODO : app provider ??
+      val now = new Date()
+      addChatEntry(chatId, author, Providers.Walkabout, msg).map{
+        entry =>
+          println(s"Chat Entry $entry")
+          // TODO: get chat members from cache..
+          val members = List(1,2,3)
+          members.foreach{
+            user =>
+              rabbitUserDispatcher ! RabbitDispatcher.SendUser(user,"APPID",Api.Request("chat","send",upickle.write(entry), Api.Route("","",0L)))
           }
-
-        //I have the ChatRoom coresponding -> I'm the owner -> Send to the room
-        case Some(cId) if rooms.contains(cId) =>
-          sendMessage(cId, m)
-          Future.successful(Api.Result(0, r.module, r.op,  "", r.routing))
-
-        //need to recreate the room
-        case Some(cId) if !rooms.contains(cId) =>
-          getMembers(cId).map { members: Seq[String] =>
-            val group = false //isGroup
-            rooms += cId -> members.toSet
-            // TODO: store cached state in redis ?
-            sendMessage(cId, m)
-            Api.Result(0, r.module, r.op, "", r.routing)
-          }
+          Api.Result(0, r.module, r.op,  upickle.write(entry), r.routing)
       }
+    }
+
+
 
       /*
     case m @ Chat.ChatPresence(jid, status) =>
@@ -166,7 +170,8 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
       case "list"          => actions(r)(upickle.read[Chat.GetChatList](r.data.toString))
       case "members"       => actions(r)(upickle.read[Chat.GetMembers](r.data.toString))
       case "presense"      => actions(r)(upickle.read[Chat.ChatPresence](r.data.toString))
-      case "receive"       => actions(r)(upickle.read[Chat.ReceiveChatMsg](r.data.toString))
+      case "send"          => actions(r)(upickle.read[Chat.ChatSend](r.data.toString))
+      case "create"        => actions(r)(upickle.read[Chat.ChatCreate](r.data.toString))
       case "setname"       => actions(r)(upickle.read[Chat.SetChatOrGroupName](r.data.toString))
       case _ =>
         logger.error("Unknown operation.")

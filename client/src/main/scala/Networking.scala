@@ -1,6 +1,7 @@
 package io.surfkit.client
 
 import io.surfkit.model.Auth.SurfKitUser
+import io.surfkit.model.Chat.ChatID
 import io.surfkit.model._
 
 import scala.util.{Failure, Success, Try}
@@ -39,15 +40,25 @@ class Networking(val uid:Long) {
     val key = s"${resp.module}-${resp.op}"
     // map over the responders.. the type deserialization happens with the hook
     //responders.get(key).map(l => l.foreach(r => r(resp.data)))
+    responders.get(key).map(l => l.foreach(r => r(resp.data)))
+    /*
     key match{
-      case "Auth-friends" =>
+      case "auth-friends" =>
         val d = upickle.read[Seq[Auth.ProfileInfo]](resp.data)
         responders.get(key).map(l => l.foreach(r => r(d)))
+      case "chat-create" =>
+        val d = upickle.read[io.surfkit.model.Chat.Chat](resp.data)
+        responders.get(key).map(l => l.foreach(r => r(d)))
+      case "user-chat-send" =>
+        val d = upickle.read[io.surfkit.model.Chat.ChatSend](resp.data)
+        responders.get(key).map(l => l.foreach(r => r(d)))
     }
+    */
   }
   ws.onopen = (x: Event) => {
     println("WS connection open")
     this.isConnected = true
+    println(sendQueue)
     sendQueue.foreach(op => ws.send(upickle.write(op)))
   }
   ws.onerror = (x: ErrorEvent) => println("some error has   occured " + x.message)
@@ -55,10 +66,10 @@ class Networking(val uid:Long) {
     println("WS connection closed")
   }
 
-  var responders = Map[String, List[(Any) => Unit]]()
-  def addResponder(module:String, op:String)(responder:(Any) => Unit) = {
+  var responders = Map[String, List[(String) => Unit]]()
+  def addResponder(module:String, op:String)(responder:(String) => Unit) = {
     val key = s"$module-$op"
-    val list:List[(Any) => Unit] = responder :: responders.get(key).getOrElse(List[(Any) => Unit]())
+    val list:List[(String) => Unit] = responder :: responders.get(key).getOrElse(List[(String) => Unit]())
     responders += (key -> list)
   }
   // TODO: would be nice if I could get this working...
@@ -83,17 +94,26 @@ class Networking(val uid:Long) {
   */
 
   private def send(op:io.surfkit.model.Socket.Op) = {
-    if( this.isConnected )ws.send(upickle.write(op))
+    val msg = upickle.write(op)
+    println("send...")
+    println(msg)
+    if( this.isConnected )ws.send(msg)
     else this.sendQueue = op :: this.sendQueue
   }
 
   def getFriends =
-    send(io.surfkit.model.Socket.Op("Auth","friends",Auth.GetFriends("APPID",uid)))
+    send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends("APPID",uid)))
+
+  def createChat(friendId: String) =
+    send(io.surfkit.model.Socket.Op("chat","create", Chat.ChatCreate(Auth.UserID(uid), List(friendId))))
+
+  def sendChatMessage(chatId: Long, msg:String) =
+    send(io.surfkit.model.Socket.Op("chat","send", Chat.ChatSend(Auth.UserID(uid), ChatID(chatId),"Testing","time", msg)))
 
   def test(v:String) = {
     //val getFriends = upickle.write(io.surfkit.model.Socket.Op("Auth","friends",Auth.GetFriends("APPID",1)))
     println(s"$v")
-    val echo = io.surfkit.model.Socket.Op("Auth","echo",Auth.Echo("Test",List(1,2)))
+    val echo = io.surfkit.model.Socket.Op("auth","echo",Auth.Echo("Test",List(1,2)))
     send(echo)
     println("send")
   }

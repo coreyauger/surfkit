@@ -61,11 +61,13 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           }
       }
 
-    case g:Auth.GetFriends =>
-      getUserFriends(g.userId).map{
+    case g:Auth.GetFriends => {
+      println("IN Auth.GetFriends")
+      getUserFriends(g.userId).map {
         jsArr =>
-          Api.Result(0, r.module, r.op,  upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
+          Api.Result(0, r.module, r.op, upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
       }
+    }
 
     case g:Auth.CreateActor =>
       println("CreateActor")
@@ -75,7 +77,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
     case e:Auth.Echo =>
       e.users.foreach( user =>
         //println(s"Sending to user $user")
-        rabbitUserDispatcher ! RabbitDispatcher.SendUser(user,"appId",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
+        rabbitUserDispatcher ! RabbitDispatcher.SendUser(user,"APPID",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
       )
       Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
   }

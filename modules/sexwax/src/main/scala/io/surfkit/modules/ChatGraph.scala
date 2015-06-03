@@ -5,7 +5,7 @@ import java.util.{Date, UUID}
 import akka.util.Timeout
 import core.common.NeoService
 import io.surfkit.model.Chat.ChatID
-import io.surfkit.model.Auth.ProfileInfo
+import io.surfkit.model.Auth.{UserID, ProfileInfo}
 import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -121,19 +121,19 @@ trait ChatGraph extends NeoService {
   }
   def connectMembers(chatId: ChatID, userId: String) = connectMemberQ(chatId, userId).getOneJs
 
-  def createChatNodeQ(chatId: ChatID, owner: String, members: Set[String]) =
+  def createChatNodeQ(chatId: ChatID, owner: UserID, members: Set[String]) =
     Q(
       """
-        MATCH (m), (u)
-        WHERE m.uid IN {members}
+        MATCH (m:Provider), (u:User)
+        WHERE m.jid IN {members}
         AND u.uid={owner}
         MERGE (c:Chat { id:{chatId} })
         CREATE UNIQUE (u)-[:OWNS]->(c)
         CREATE UNIQUE (m)-[:MEMBER_OF]->(c)
-        RETURN c.chatId as chatId
+        RETURN c.id as chatId
       """
-    ).use("chatId" -> chatId.toString, "owner" -> owner, "members" -> members)
-  def createChatNode(chatId: ChatID, owner: String, members: Set[String]) = createChatNodeQ(chatId, owner, members).getSingle[String]("chatId")
+    ).use("chatId" -> chatId.chatId, "owner" -> owner.userId, "members" -> members)
+  def createChatNode(chatId: ChatID, owner: UserID, members: Set[String]) = createChatNodeQ(chatId, owner, members).getSingle[Long]("chatId")
 
   def getOwnerQ(chatId: ChatID) =
     Q("""
@@ -152,6 +152,19 @@ trait ChatGraph extends NeoService {
         WHERE nbR = 2
         RETURN chatId
       """).use("author" -> author, "recipient" -> recipient).getMultiple[String]("chatId")
+
+
+
+  def findChat(members: Set[String]): Future[Seq[Long]] =
+    Q( s"""
+        MATCH ${members.map(jid => s"(:Provider {jid:'$jid'})-[:MEMBER_OF]->(c:Chat)").mkString("", ",", "")}
+        MATCH (u:Provider)-[m:MEMBER_OF]->(c:Chat)
+        WITH c.id as chatId, count(DISTINCT m) as nbR
+        WHERE nbR = ${members.size}
+        RETURN chatId
+      """).use("members" -> members).getMultiple[Long]("chatId")
+
+
 
 
 

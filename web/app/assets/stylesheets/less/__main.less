@@ -4,29 +4,44 @@
 
 
 html{
-  body{
+  body {
 
-    .chat-cnt{
-      position: fixed;
-      top: 0px;
-      right: 0px;
-      width: 200px;
-      bottom: 0px;
-      border-left: 1px solid #ccc;
-      .friend-list{
-        .tools{
-          padding: 5px;
-        }
-        .friend-card{
-          padding: 10px;
-          .avatar{
-            width: 48px;
-            height: 48px;
-            border-radius: 24px;
-            border: 2px solid white;
+    .chat-module {
+      .chats {
+        position: fixed;
+        bottom: 0px;
+        display: flex;
+        .chat {
+          .entries{
+            height: 300px;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            overflow-wrap: break-word;
           }
-          span{
-            margin-left: 10px;
+        }
+      }
+      .chat-cnt {
+        position: fixed;
+        top: 0px;
+        right: 0px;
+        width: 200px;
+        bottom: 0px;
+        border-left: 1px solid #ccc;
+        .friend-list {
+          .tools {
+            padding: 5px;
+          }
+          .friend-card {
+            padding: 10px;
+            .avatar {
+              width: 48px;
+              height: 48px;
+              border-radius: 24px;
+              border: 2px solid white;
+            }
+            span {
+              margin-left: 10px;
+            }
           }
         }
       }
