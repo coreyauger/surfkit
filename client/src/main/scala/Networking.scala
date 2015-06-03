@@ -1,5 +1,7 @@
 package io.surfkit.client
 
+import java.util.Date
+
 import io.surfkit.model.Auth.SurfKitUser
 import io.surfkit.model.Chat.ChatID
 import io.surfkit.model._
@@ -107,8 +109,11 @@ class Networking(val uid:Long) {
   def createChat(friendId: String) =
     send(io.surfkit.model.Socket.Op("chat","create", Chat.ChatCreate(Auth.UserID(uid), List(friendId))))
 
+  def getChatHistory(cid:Long) =
+    send(io.surfkit.model.Socket.Op("chat","history", Chat.GetHistory(Chat.ChatID(cid))))
+
   def sendChatMessage(chatId: Long, msg:String) =
-    send(io.surfkit.model.Socket.Op("chat","send", Chat.ChatSend(Auth.UserID(uid), ChatID(chatId),"Testing","time", msg)))
+    send(io.surfkit.model.Socket.Op("chat","send", Chat.ChatSend(Auth.UserID(uid), ChatID(chatId),s"$uid@APPID",new Date().getTime, msg)))
 
   def test(v:String) = {
     //val getFriends = upickle.write(io.surfkit.model.Socket.Op("Auth","friends",Auth.GetFriends("APPID",1)))

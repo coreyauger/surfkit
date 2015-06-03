@@ -37,17 +37,15 @@ trait ChatGraph extends NeoService {
   createNeo4JConstrains()
 
   //Do we really need all those return projections
-  def getMembersDetailsQ(chatId: String) =
+  def getMembersDetailsQ(chatId: ChatID) =
     Q(
       """
         |MATCH
-        |   (u:User)-[:MEMBER_OF]->(c:Chat {id:{chatId}})
-        |MATCH
-        |   (u:User)-[:HAS_ACCOUNT]->(p:Provider)
-        |RETURN c.id as chatId, u.uid as uid, c.name as group, u.token as token, p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl;
+        |   (p:Provider)-[:MEMBER_OF]->(c:Chat {id:{chatId}})
+        |RETURN p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl;
       """
-    ).use("chatId" -> chatId)
-  def getMembersDetails(chatId: String) = getMembersDetailsQ(chatId).getMany[Auth.ProfileInfo]
+    ).use("chatId" -> chatId.chatId)
+  def getMembersDetails(chatId: ChatID) = getMembersDetailsQ(chatId).getMany[Auth.ProfileInfo]
 
   def getMembersQ(chatId: ChatID) =
     Q(

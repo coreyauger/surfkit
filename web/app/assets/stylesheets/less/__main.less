@@ -12,11 +12,46 @@ html{
         bottom: 0px;
         display: flex;
         .chat {
+          .panel;
+          .panel-default;
+          header{
+            .panel-heading;
+            position: relative;
+            border-bottom: 1px solid @panel-inner-border;
+            :last-child{
+              position: absolute;
+              top:3px;
+              right: 10px;
+            }
+          }
+          margin-left: 20px;
+          margin-bottom: 0px;
+          width: 250px;
           .entries{
-            height: 300px;
-            overflow-y: scroll;
+            height: 200px;
             overflow-x: hidden;
             overflow-wrap: break-word;
+            .entry{
+              .avatar{
+                >img {
+                  width: 32px;
+                  height: 32px;
+                  border-radius: 16px;
+                  border: 2px solid white;
+                  margin: 5px;
+                }
+              }
+            }
+          }
+          .cntrls{
+            :first-child{
+              border-radius: 0px;
+              border-left:0px;
+            }
+            :last-child{
+              border-radius: 0px;
+              border-right:0px;
+            }
           }
         }
       }

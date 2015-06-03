@@ -44,9 +44,19 @@ object SurfKitAppReact extends JSApp{
     socket.addResponder("chat","create"){
       f =>
         val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
-        println(s"chat create.. $chat")
-        //chats  += (chat.chatid -> chat)
-        $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, onChatMessageChange,onSendChatMessage,"") ))
+        // check if this chat was already created.. and if so just set the focus...
+        val setFocus = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
+          c =>
+            // just set focus..
+            true
+        }.orElse[Boolean]{
+          println(s"chat create.. $chat")
+          socket.getChatHistory(chat.chatid)  // request some chat history...
+          $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, onChatMessageChange,onSendChatMessage,"") ))
+          Some(false)
+        }
+
+
     }
     socket.addResponder("user","chat-send"){
       f =>
@@ -60,6 +70,16 @@ object SurfKitAppReact extends JSApp{
         if(alreadyOpen)$.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == entry.chatid) cs else c)))
         else $.modState(s => s.copy(chatState = s.chatState.filter(_.chat.chatid != entry.chatid) :+ cs ))
     }
+    socket.addResponder("chat","history"){
+      f =>
+        println("GOT NEW CHAT HISTORY.....")
+        val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
+        val cs:ChatState = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
+          c =>
+            ChatState(c.chat.copy(entries = c.chat.entries ++ chat.entries),c.onMessageChange,c.onSendMessage,c.msg)
+        }.getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,chat.members,chat.entries), onChatMessageChange,onSendChatMessage,""))
+        $.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == chat.chatid) cs else c)))
+    }
 
     // ask for friends...
     socket.getFriends
@@ -70,7 +90,7 @@ object SurfKitAppReact extends JSApp{
       val cs:ChatState = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
         c =>
           ChatState(c.chat,c.onMessageChange,c.onSendMessage,msg)
-      }.getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,Nil,Nil), onChatMessageChange,onSendChatMessage,msg))
+      }.getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,chat.members,chat.entries), onChatMessageChange,onSendChatMessage,msg))
       $.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == chat.chatid) cs else c)))
     }
 
@@ -88,6 +108,7 @@ object SurfKitAppReact extends JSApp{
       println(s"You selected ${f.fullName}")
       println(s"You selected ${f.jid}")
       // we want to create a chat with this friend now...
+      // check if chat is already open..
       socket.createChat(f.jid)
     }
 
@@ -120,7 +141,6 @@ object SurfKitAppReact extends JSApp{
 
 
 
-
   val FriendCard = ReactComponentB[(Auth.ProfileInfo, UserSelectEvent)]("FriendCard")
     .render(props => {
       val (friend,onSelect) = props
@@ -137,7 +157,11 @@ object SurfKitAppReact extends JSApp{
       .render(props => {
       val (entry) = props
       <.div(^.className:="entry",
-        entry.json
+        <.div(^.className:="avatar",
+          <.img(^.src:=entry.from.avatarUrl)
+        ),
+        <.span(^.className:="uname",entry.from.fullName),
+        <.span(entry.json)
       )
     })
     .build
@@ -145,10 +169,10 @@ object SurfKitAppReact extends JSApp{
   val ChatControls= ReactComponentB[(ChatState)]("ChatEntry")
     .render(props => {
       val (chatState) = props
-      <.div(^.className:="cntrls",
-        <.div("..."),
+      <.div(^.className:="cntrls input-group",
+        <.span(^.className:="fa fa-ellipsis-v input-group-addon"),
         <.input(^.`type`:="text", ^.className := "form-control", ^.placeholder := "type message", ^.onChange ==> ((e:ReactEventI) => {chatState.onMessageChange(chatState.chat,e.target.value)}), ^.value := chatState.msg ),
-        <.div("send",^.onClick --> chatState.onSendMessage(chatState.chat,chatState.msg))
+        <.span(^.className:="fa fa-paper-plane input-group-addon",^.onClick --> chatState.onSendMessage(chatState.chat,chatState.msg))
       )
     })
     .build
@@ -158,7 +182,9 @@ object SurfKitAppReact extends JSApp{
     .render(props => {
       val (chatState) = props
       <.div(^.className:="chat",
-        <.header("HEADER"),
+        <.header("HEADER Name",
+          <.i(^.className:="fa fa-close")
+        ),
         <.div(^.className:="entries",
           chatState.chat.entries.map(e => ChatEntry( (e) ))
         ),

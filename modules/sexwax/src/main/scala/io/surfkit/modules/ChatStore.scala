@@ -3,7 +3,7 @@ package io.surfkit.modules
 import java.util.Date
 
 import io.surfkit.core.common.PostgresService
-import io.surfkit.model.Chat.{ChatEntry, ChatID}
+import io.surfkit.model.Chat.{DbEntry, ChatID}
 import io.surfkit.model._
 import org.joda.time.LocalDateTime
 import play.api.libs.json._
@@ -174,8 +174,8 @@ trait ChatStore extends PostgresService {
 
 
 
-  implicit val chatEntryReader = RowReader[Chat.ChatEntry]{ row =>
-    Chat.ChatEntry(
+  implicit val chatEntryReader = RowReader[Chat.DbEntry]{ row =>
+    Chat.DbEntry(
       row("chatentry_chat_key").asInstanceOf[Long],
       row("chatentry_id").asInstanceOf[Long],
       row("chatentry_from_jid").asInstanceOf[String],
@@ -207,7 +207,7 @@ trait ChatStore extends PostgresService {
     ).use(dateTimeStr(), dateTimeStr(), uid, name, permission).getSingle[Long]("chat_id")
   }
 
-  def getChatEntriesByChatId( id: ChatID, offset: Long = 0L, limit: Long = 20L ):Future[Seq[Chat.ChatEntry]] = {
+  def getChatEntriesByChatId( id: ChatID, offset: Long = 0L, limit: Long = 20L ):Future[Seq[Chat.DbEntry]] = {
     Q(
       """
         |SELECT *
@@ -216,10 +216,10 @@ trait ChatStore extends PostgresService {
         |ORDER BY CE.chatentry_id DESC
         |LIMIT ? OFFSET ?;
       """
-    ).use(id, limit, offset).getRows[Chat.ChatEntry]
+    ).use(id, limit, offset).getRows[Chat.DbEntry]
   }
 
-  def getChatEntriesForChats(chatIds:Seq[ChatID], date: Date, limit: Int = 25):Future[Seq[Chat.ChatEntry]] = {
+  def getChatEntriesForChats(chatIds:Seq[ChatID], date: Date, limit: Int = 25):Future[Seq[Chat.DbEntry]] = {
     Q(
       """
         |SELECT DISTINCT ON (ce.chatentry_chat_key) *
@@ -229,10 +229,10 @@ trait ChatStore extends PostgresService {
         |ORDER BY ce.chatentry_chat_key, ce.chatentry_id DESC
         |LIMIT ?;
       """
-    ).use(chatIds.toArray, dateTimeStr(date), limit).getRows[Chat.ChatEntry]
+    ).use(chatIds.toArray, dateTimeStr(date), limit).getRows[Chat.DbEntry]
   }
 
-  def addChatEntry(chatid: ChatID, from: String, provider: Providers.Provider, msg: String):Future[ChatEntry] = {
+  def addChatEntry(chatid: ChatID, from: String, provider: Providers.Provider, msg: String):Future[DbEntry] = {
     val now = new Date()
     val nowStr = dateTimeStr(now)
     Q(
@@ -244,7 +244,7 @@ trait ChatStore extends PostgresService {
       """
     ).use(from, nowStr, chatid.chatId, provider.idx, Json.obj("msg" -> msg, "ts" -> nowStr)).getSingle[Long]("chatentry_id").map{
       entryId =>
-        ChatEntry(chatid.chatId, entryId, from, now.getTime, provider.idx.asInstanceOf[Short], Json.obj("msg" -> msg, "ts" -> dateTimeStr()).toString)
+        DbEntry(chatid.chatId, entryId, from, now.getTime, provider.idx.asInstanceOf[Short], Json.obj("msg" -> msg, "ts" -> dateTimeStr()).toString)
     }
   }
 

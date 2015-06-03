@@ -95,21 +95,22 @@ object Chat {
   case class CreateGroup(name: String, permission: Short, members: List[String]) extends ChatMsg
   case class ChatPresence(jid: String, status: String) extends ChatMsg
   case class GetChatList(uid:UserID, since: String) extends ChatMsg
-  case class GetHistory(chatId: ChatID, maxId: Option[Long], offset: Option[Long]) extends ChatMsg
-  case class GetMembers(chatId: ChatID) extends ChatMsg
+  case class GetHistory(chatId: ChatID, maxId: Option[Long] = None, offset: Option[Long] = None) extends ChatMsg
+  case class GetChat(chatId: ChatID) extends ChatMsg
   case class GetUserGroups() extends ChatMsg
   case class MemberJoin(chatId: ChatID, memberId: String) extends ChatMsg
   case class ChatSend(userId:UserID,
                             chatId: ChatID,
                             author: String,
-                            time: String,
+                            time: Long,
                             msg: String) extends ChatMsg
   case class ChatCreate(userId:UserID,members: List[String]) extends ChatMsg
   case class SetChatOrGroupName(chatId: ChatID, name: String) extends ChatMsg
 
 
   //
-  case class ChatEntry(chatid:Long, chatentryid:Long, from:String, timestamp:Long, provider:Short, json:String) extends ChatMsg
+  case class DbEntry(chatid:Long, chatentryid:Long, jid:String, timestamp:Long, provider:Short, json:String) extends ChatMsg
+  case class ChatEntry(chatid:Long, chatentryid:Long, timestamp:Long, provider:Short, json:String, from:Auth.ProfileInfo) extends ChatMsg
   case class Chat(chatid:Long, members:Seq[Auth.ProfileInfo], entries:Seq[ChatEntry]) extends ChatMsg
 }
 
