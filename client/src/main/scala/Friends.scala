@@ -14,7 +14,8 @@ object Friends{
   type FriendSelectEvent = (Auth.ProfileInfo) => Unit
   type FriendAddEvent = (Set[Auth.ProfileInfo]) => Unit
 
-  case class FriendsState(friends:Seq[Auth.ProfileInfo], filter:String)
+  case class FriendEvents(onFilterChange:ReactEvent, onFriendSelect:FriendSelectEvent, onFriendAddEvent:FriendAddEvent)
+  case class FriendsState(friends:Seq[Auth.ProfileInfo], filter:String, events:FriendEvents)
 
 
   val FriendCard = ReactComponentB[(Auth.ProfileInfo, FriendSelectEvent)]("FriendCard")
@@ -27,23 +28,23 @@ object Friends{
     })
     .build
 
-  val FriendList = ReactComponentB[(FriendsState, ReactEvent, FriendSelectEvent)]("FriendList")
+  val FriendList = ReactComponentB[(FriendsState)]("FriendList")
     .render(props => {
-      val (friends,onFilterChange, onFriendSelect) = props
+      val (friends) = props
       val name = friends.filter.toLowerCase
       <.div(^.className:="friend-list",
         <.header(^.className:="tools",
-          SearchBar( (friends.filter,onFilterChange, null,"fa fa-search") )
+          SearchBar( (friends.filter,friends.events.onFilterChange, null,"fa fa-search") )
         ),
-        <.div(friends.friends.filter(_.fullName.toLowerCase.contains(name)).map(f => FriendCard( (f,onFriendSelect) ) ))
+        <.div(friends.friends.filter(_.fullName.toLowerCase.contains(name)).map(f => FriendCard( (f,friends.events.onFriendSelect) ) ))
       )
     })
     .build
 
 
-  val FriendSelector = ReactComponentB[(FriendsState, Set[Auth.ProfileInfo], ReactEvent, FriendAddEvent)]("FriendFinder")
+  val FriendSelector = ReactComponentB[(FriendsState, Set[Auth.ProfileInfo])]("FriendFinder")
     .render(props => {
-      val (friends,m,onFilterChange, onFriendsAdd) = props
+      val (friends,m) = props
       var members = m
       val name = friends.filter.toLowerCase
       val friendList =
@@ -53,8 +54,8 @@ object Friends{
           Nil
       <.div(^.className:="friend-list",
         <.header(^.className:="tools",
-          SearchBar( (friends.filter,onFilterChange, (i:String) =>{
-            onFriendsAdd(members)
+          SearchBar( (friends.filter,friends.events.onFilterChange, (i:String) =>{
+            friends.events.onFriendAddEvent(members)
           },"fa fa-plus") )
         ),
         <.div(friendList.map(f => FriendCard( (f,(friend:Auth.ProfileInfo)=>{

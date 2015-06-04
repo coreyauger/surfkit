@@ -31,8 +31,9 @@ object SurfKitAppReact extends JSApp{
 
   class Backend($: BackendScope[Unit, State], socket:Networking) extends Object with io.surfkit.client.Chat {
 
-    def modChatState(chat:io.surfkit.model.Chat.Chat)(f: (ChatState) => ChatState ) = {
-      val cs:ChatState = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map(c => f(c)).getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,chat.members,chat.entries), createChatEvents,"", ""))
+    def modChatState(c:io.surfkit.model.Chat.Chat)(f: (ChatState) => ChatState ) = {
+      implicit val chat = c
+      val cs:ChatState = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map(c => f(c)).getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,chat.members,chat.entries), createChatEvents,"", "",$.state.friendState.copy(events = FriendEvents(onChatFilterChange, null, onFriendsAddToChat))))
       $.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == chat.chatid) cs else c)))
     }
 
@@ -40,11 +41,11 @@ object SurfKitAppReact extends JSApp{
       f =>
         val friends = upickle.read[Seq[Auth.ProfileInfo]](f)
         println(s"friends.. $friends")
-        $.modState(s => s.copy(friendState = FriendsState(friends,"")))
+        $.modState(s => s.copy(friendState = FriendsState(friends,"",FriendEvents(onFilterChange,onFriendSelect, null))))
     }
     socket.addResponder("chat","create"){
       f =>
-        val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
+        implicit val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
         // check if this chat was already created.. and if so just set the focus...
         val setFocus = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
           c =>
@@ -53,7 +54,7 @@ object SurfKitAppReact extends JSApp{
         }.orElse[Boolean]{
           println(s"chat create.. $chat")
           socket.getChatHistory(chat.chatid)  // request some chat history...
-          $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, createChatEvents, "","") ))
+          $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, createChatEvents, "","",$.state.friendState.copy(events = FriendEvents(onChatFilterChange, null, onFriendsAddToChat))) ))
           Some(false)
         }
     }
@@ -64,8 +65,8 @@ object SurfKitAppReact extends JSApp{
         // TODO: need to watch this and see if this turns into a massive copy operation??
         val (cs,alreadyOpen) = $.state.chatState.filter(_.chat.chatid == entry.chatid).headOption.map{
           c =>
-            (ChatState(c.chat.copy(entries = c.chat.entries :+ entry),c.events, c.ui, c.msg),true)
-        }.getOrElse[(ChatState,Boolean)]( (ChatState(io.surfkit.model.Chat.Chat(entry.chatid,Nil,Seq(entry)), createChatEvents,"", ""),false) )
+            (ChatState(c.chat.copy(entries = c.chat.entries :+ entry),c.events, c.ui, c.msg, c.friendState),true)
+        }.getOrElse[(ChatState,Boolean)]( (ChatState(io.surfkit.model.Chat.Chat(entry.chatid,Nil,Seq(entry)), createChatEvents,"", "",$.state.friendState.copy(events = FriendEvents(null, null, onFriendsAddToChat)) ),false)) // TODO: is null safe for events ??
         if(alreadyOpen)$.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == entry.chatid) cs else c)))
         else{
           socket.getChatHistory(entry.chatid)
@@ -74,9 +75,9 @@ object SurfKitAppReact extends JSApp{
     }
     socket.addResponder("chat","history"){
       f =>
-        val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
+        implicit val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
         // TODO: compact enties from same user in same relitive time
-        modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg))
+        modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg, c.friendState.copy(events = c.friendState.events.copy(onFilterChange = onChatFilterChange))))
     }
 
     // ask for friends...
@@ -88,7 +89,7 @@ object SurfKitAppReact extends JSApp{
     def onShowAddFriends(chat:io.surfkit.model.Chat.Chat):Unit = {
       modChatState(chat)(c =>ChatState(c.chat, c.events,
         if( c.ui.contains("addFriends ")) c.ui.replace(ChatUI.ShowAddFriend,"") else c.ui + ChatUI.ShowAddFriend
-        , c.msg))
+        , c.msg, c.friendState))
     }
 
     def onChatClose(chat:io.surfkit.model.Chat.Chat):Unit = {
@@ -97,12 +98,12 @@ object SurfKitAppReact extends JSApp{
 
     def onChatMessageChange(chat:io.surfkit.model.Chat.Chat, msg: String):Unit = {
       // TODO: need to watch this and see if this turns into a massive copy operation??
-      modChatState(chat)(c =>ChatState(c.chat, c.events, c.ui, msg))
+      modChatState(chat)(c =>ChatState(c.chat, c.events, c.ui, msg, c.friendState))
     }
 
     def onSendChatMessage(chat:io.surfkit.model.Chat.Chat, msg: String):Unit ={
       socket.sendChatMessage(chat.chatid,msg)
-      modChatState(chat)(c =>ChatState(c.chat,c.events, c.ui, ""))
+      modChatState(chat)(c =>ChatState(c.chat,c.events, c.ui, "", c.friendState))
       // TODO: show a ghosted msg that gets filled in when we get result from server..
 
     }
@@ -110,6 +111,11 @@ object SurfKitAppReact extends JSApp{
     def onFilterChange(e: ReactEventI):Unit = {
       val filter = e.target.value
       $.modState(_.copy(friendState = $.state.friendState.copy(filter = filter)))
+    }
+
+    def onChatFilterChange(e: ReactEventI)(implicit chat:io.surfkit.model.Chat.Chat):Unit = {
+      val filter = e.target.value
+      modChatState(chat)(c =>ChatState(c.chat, c.events, c.ui, c.msg, c.friendState.copy(filter = filter)))
     }
 
     def onFriendsAddToChat(friends:Set[Auth.ProfileInfo]):Unit = {
@@ -133,108 +139,30 @@ object SurfKitAppReact extends JSApp{
   }
 
   val SurfKitApp = ReactComponentB[Unit]("SurfKitApp")
-    .initialState(State(FriendsState(Nil,""), Nil,  Nil, ""))
+    .initialState(State(FriendsState(Nil,"",FriendEvents(null,null,null)), Nil,  Nil, ""))
     .backend(s => new Backend(s, new Networking(Environment.userId)))
     .render((_,S,B) =>
       <.div(
-        ChatModule((S,B))
+        ChatModule((S.chatState,S.friendState))
       )
     ).buildU
 
   // TODO: factor these controls out into the Chat object...
 
-  val ChatEntry= ReactComponentB[(io.surfkit.model.Chat.ChatEntry)]("ChatEntry")
-      .render(props => {
-      val (entry) = props
-      val dyn = JSON.parse(entry.json)
-      val date = new scala.scalajs.js.Date()
-      date.setTime(entry.timestamp.toDouble)
-      <.div(^.className:="entry",
-        <.div(
-          <.img(^.className:="avatar",^.src:=entry.from.avatarUrl)
-        ),
-        <.div(
-          <.span(^.className:="uname",entry.from.fullName),
-          <.span(^.className:="time",date.toLocaleString),
-          <.span(dyn.msg.toString)
-        )
-      )
-    })
-    .build
 
-  val ChatControls= ReactComponentB[(ChatState)]("ChatEntry")
+
+  val ChatModule = ReactComponentB[(Seq[ChatState],FriendsState)]("ChatApp")
     .render(props => {
-      val (chatState) = props
-      <.div(^.className:="cntrls input-group",
-        <.span(^.className:="fa fa-ellipsis-v input-group-addon"),
-        <.input(^.`type`:="text", ^.className := "form-control", ^.placeholder := "type message", ^.onChange ==> ((e:ReactEventI) => {chatState.events.onMessageChange(chatState.chat,e.target.value)}), ^.value := chatState.msg ),
-        <.span(^.className:="fa fa-paper-plane input-group-addon",^.onClick --> chatState.events.onSendMessage(chatState.chat,chatState.msg))
-      )
-    })
-    .build
-
-  val ChatEntryList = ReactComponentB[(ChatState)]("ChatEntryList")
-    .render(props => {
-      val (chatState) = props
-      // TODO: only want loading when user scrolls to top..
-      // TODO: need to fetch more entries
-      <.div(^.className:="entries",
-        <.div(^.className:="loading",
-          <.i(^.className:="fa fa-circle-o-notch fa-spin")
-        ),
-        chatState.chat.entries.map(e => ChatEntry( (e) ))
-      )
-    }).componentWillUpdate( (self, prevProps, prevState) =>{
-      val node = self.getDOMNode()
-      val shouldScroll = (node.scrollTop + node.offsetHeight) == node.scrollHeight
-      //self.modState() TODO: see if we can store the shouldScroll ?
-    }).componentDidUpdate( (self, prevProps, prevState) =>{
-      val node = self.getDOMNode()
-      node.scrollTop = node.scrollHeight
-    })
-    .build
-
-
-  val Chat = ReactComponentB[(ChatState, FriendsState, Backend)]("Chat")
-    .render(props => {
-      val (chatState,friendStat,b) = props
-      val names = chatState.chat.members.take(3).map(_.fullName).mkString(",")
-      <.div(^.className:="chat",
-        <.header(names,
-          <.i(^.className:="fa fa-user-plus",^.onClick --> chatState.events.onShowAddFriends(chatState.chat) ),
-          <.i(^.className:="fa fa-close",^.onClick --> chatState.events.onChatClose(chatState.chat) )
-        ),
-        if (chatState.ui.contains(ChatUI.ShowAddFriend))FriendSelector( (friendStat, chatState.chat.members.toSet, b.onFilterChange, b.onFriendsAddToChat) ) else <.div() ,
-        ChatEntryList( (chatState) ),
-        ChatControls( (chatState) )
-      )
-    })
-    .build
-
-
-  val Chats = ReactComponentB[(Seq[ChatState], FriendsState, Backend)]("Chats")
-    .render(props => {
-      val (chats, friends, back) = props
-      <.div(^.className:="chats",
-        chats.map(c => Chat( (c,friends,back) ))
-      )
-    })
-    .build
-
-
-
-  val ChatModule = ReactComponentB[(State,Backend)]("ChatApp")
-    .render(props => {
-      val (s,b) = props
+      val (cs,fs) = props
       <.div(^.className:="chat-module",
         <.div(^.className:="chat-cnt",
           <.ul(^.className:="nav nav-tabs",
             <.li(^.role:="presentation", ^.className:="active",<.a(^.href:="#","Friends")),
             <.li(^.role:="presentation",<.a(^.href:="#","History"))
           ),
-          FriendList( (s.friendState,b.onFilterChange, b.onFriendSelect) )
+          FriendList( (fs) )
         ),
-        Chats( (s.chatState, s.friendState, b) )
+        Chats( (cs) )
       )
     })
     .build
