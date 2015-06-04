@@ -21,27 +21,15 @@ object Environment{
 
 object SurfKitAppReact extends JSApp{
 
-  type ReactEvent = (ReactEventI) => Unit
-  type FilterEvent = (String) => Unit
-  type FriendSelectEvent = (Auth.ProfileInfo) => Unit
-  type FriendAddEvent = (Set[Auth.ProfileInfo]) => Unit
-  type SendChatMessage = (io.surfkit.model.Chat.Chat, String) => Unit
-  type ChatMessageChange = (io.surfkit.model.Chat.Chat, String) => Unit
-  type ChatCloseEvent = (io.surfkit.model.Chat.Chat) => Unit
-  type ChatShowAddFriends = (io.surfkit.model.Chat.Chat) => Unit
 
-  case class FriendsState(friends:Seq[Auth.ProfileInfo], filter:String)
-  case class ChatEvents(onMessageChange:ChatMessageChange, onSendMessage:SendChatMessage, onChatClose:ChatCloseEvent, onShowAddFriends:ChatShowAddFriends)
-  case class ChatState(chat:io.surfkit.model.Chat.Chat, events:ChatEvents, ui:String, msg:String)
+  import io.surfkit.client.Base._
+  import io.surfkit.client.Chat._
+  import io.surfkit.client.Friends._
+
   case class State(friendState:FriendsState, chatState: Seq[ChatState], items: List[String], text: String)
 
-  object ChatUI{
-    final val ShowAddFriend = "addFriends "
-  }
 
-  class Backend($: BackendScope[Unit, State], socket:Networking) {
-    // store the "meat" of the chat outside the State to avoid massive copy overhead
-    //var chats = Map[Long, List[io.surfkit.model.Chat.ChatEntry]]()
+  class Backend($: BackendScope[Unit, State], socket:Networking) extends Object with io.surfkit.client.Chat {
 
     def modChatState(chat:io.surfkit.model.Chat.Chat)(f: (ChatState) => ChatState ) = {
       val cs:ChatState = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map(c => f(c)).getOrElse[ChatState](ChatState(io.surfkit.model.Chat.Chat(chat.chatid,chat.members,chat.entries), createChatEvents,"", ""))
@@ -153,83 +141,21 @@ object SurfKitAppReact extends JSApp{
       )
     ).buildU
 
-
-  val SearchBar = ReactComponentB[(String, ReactEvent, FilterEvent, String)]("SearchBar")
-    .render(P =>{
-    val (text, onChange, onSearch, icon) = P
-      <.div(^.className := "input-group",
-        <.input(^.className := "form-control", ^.placeholder := "search", ^.onChange ==> onChange, ^.value := text ),
-        <.span(^.className:="input-group-btn",
-          <.button(^.className:="btn btn-default ", ^.onClick --> onSearch(text),
-            <.i(^.className:=icon)
-          )
-        )
-      )
-    })
-    .build
-
-
-
-  val FriendCard = ReactComponentB[(Auth.ProfileInfo, FriendSelectEvent)]("FriendCard")
-    .render(props => {
-      val (friend,onSelect) = props
-      <.div(^.className:="friend-card",^.onClick --> onSelect(friend),
-        <.img(^.src:= friend.avatarUrl, ^.className:="avatar"),
-        <.span(friend.fullName)
-      )
-    })
-    .build
-
-
-  val FriendList = ReactComponentB[(FriendsState, ReactEvent, FriendSelectEvent)]("FriendList")
-    .render(props => {
-      val (friends,onFilterChange, onFriendSelect) = props
-      val name = friends.filter.toLowerCase
-      <.div(^.className:="friend-list",
-        <.header(^.className:="tools",
-          SearchBar( (friends.filter,onFilterChange, null,"fa fa-search") )
-        ),
-        <.div(friends.friends.filter(_.fullName.toLowerCase.contains(name)).map(f => FriendCard( (f,onFriendSelect) ) ))
-      )
-    })
-    .build
-
-
-  val FriendSelector = ReactComponentB[(FriendsState, Set[Auth.ProfileInfo], ReactEvent, FriendAddEvent)]("FriendFinder")
-    .render(props => {
-      val (friends,m,onFilterChange, onFriendsAdd) = props
-      var members = m
-      val name = friends.filter.toLowerCase
-      val friendList =
-        if(name.length > 0)
-          friends.friends.filter(_.fullName.toLowerCase.contains(name))
-        else
-          Nil
-      <.div(^.className:="friend-list",
-        <.header(^.className:="tools",
-          SearchBar( (friends.filter,onFilterChange, (i:String) =>{
-            onFriendsAdd(members)
-          },"fa fa-plus") )
-        ),
-        <.div(friendList.map(f => FriendCard( (f,(friend:Auth.ProfileInfo)=>{
-          members =  members + friend
-        }) ) ))
-      )
-    })
-    .build
-
+  // TODO: factor these controls out into the Chat object...
 
   val ChatEntry= ReactComponentB[(io.surfkit.model.Chat.ChatEntry)]("ChatEntry")
       .render(props => {
       val (entry) = props
       val dyn = JSON.parse(entry.json)
+      val date = new scala.scalajs.js.Date()
+      date.setTime(entry.timestamp.toDouble)
       <.div(^.className:="entry",
         <.div(
           <.img(^.className:="avatar",^.src:=entry.from.avatarUrl)
         ),
         <.div(
           <.span(^.className:="uname",entry.from.fullName),
-          <.span(^.className:="time",entry.timestamp),
+          <.span(^.className:="time",date.toLocaleString),
           <.span(dyn.msg.toString)
         )
       )
@@ -250,7 +176,12 @@ object SurfKitAppReact extends JSApp{
   val ChatEntryList = ReactComponentB[(ChatState)]("ChatEntryList")
     .render(props => {
       val (chatState) = props
+      // TODO: only want loading when user scrolls to top..
+      // TODO: need to fetch more entries
       <.div(^.className:="entries",
+        <.div(^.className:="loading",
+          <.i(^.className:="fa fa-circle-o-notch fa-spin")
+        ),
         chatState.chat.entries.map(e => ChatEntry( (e) ))
       )
     }).componentWillUpdate( (self, prevProps, prevState) =>{
@@ -311,7 +242,7 @@ object SurfKitAppReact extends JSApp{
 
 
   def main(): Unit = {
-    React.render(SurfKitApp(), document.getElementById("content"))
+    //React.render(SurfKitApp(), document.getElementById("content"))
   }
 
   @JSExport

@@ -93,7 +93,8 @@ object Chat {
 
   sealed trait ChatMsg extends Model
   case class CreateGroup(name: String, permission: Short, members: List[String]) extends ChatMsg
-  case class ChatPresence(jid: String, status: String) extends ChatMsg
+  case class ChatPresenceRequest(jid: String, status: String) extends ChatMsg
+  case class ChatPresenceResponse(jid: String, status: String) extends ChatMsg
   case class GetChatList(uid:UserID, since: String) extends ChatMsg
   case class GetHistory(chatId: ChatID, maxId: Option[Long] = None, offset: Option[Long] = None) extends ChatMsg
   case class GetChat(chatId: ChatID) extends ChatMsg

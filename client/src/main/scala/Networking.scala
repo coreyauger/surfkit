@@ -43,19 +43,6 @@ class Networking(val uid:Long) {
     // map over the responders.. the type deserialization happens with the hook
     //responders.get(key).map(l => l.foreach(r => r(resp.data)))
     responders.get(key).map(l => l.foreach(r => r(resp.data)))
-    /*
-    key match{
-      case "auth-friends" =>
-        val d = upickle.read[Seq[Auth.ProfileInfo]](resp.data)
-        responders.get(key).map(l => l.foreach(r => r(d)))
-      case "chat-create" =>
-        val d = upickle.read[io.surfkit.model.Chat.Chat](resp.data)
-        responders.get(key).map(l => l.foreach(r => r(d)))
-      case "user-chat-send" =>
-        val d = upickle.read[io.surfkit.model.Chat.ChatSend](resp.data)
-        responders.get(key).map(l => l.foreach(r => r(d)))
-    }
-    */
   }
   ws.onopen = (x: Event) => {
     println("WS connection open")
@@ -107,13 +94,13 @@ class Networking(val uid:Long) {
     send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends("APPID",uid)))
 
   def createChat(friendJIds: Set[String]) =
-    send(io.surfkit.model.Socket.Op("chat","create", Chat.ChatCreate(Auth.UserID(uid), friendJIds)))
+    send(io.surfkit.model.Socket.Op("chat","create", io.surfkit.model.Chat.ChatCreate(Auth.UserID(uid), friendJIds)))
 
   def getChatHistory(cid:Long) =
-    send(io.surfkit.model.Socket.Op("chat","history", Chat.GetHistory(Chat.ChatID(cid))))
+    send(io.surfkit.model.Socket.Op("chat","history", io.surfkit.model.Chat.GetHistory(io.surfkit.model.Chat.ChatID(cid))))
 
   def sendChatMessage(chatId: Long, msg:String) =
-    send(io.surfkit.model.Socket.Op("chat","send", Chat.ChatSend(Auth.UserID(uid), ChatID(chatId),s"$uid@APPID",new Date().getTime, msg)))
+    send(io.surfkit.model.Socket.Op("chat","send", io.surfkit.model.Chat.ChatSend(Auth.UserID(uid), ChatID(chatId),s"$uid@APPID",new Date().getTime, msg)))
 
   def test(v:String) = {
     //val getFriends = upickle.write(io.surfkit.model.Socket.Op("Auth","friends",Auth.GetFriends("APPID",1)))
