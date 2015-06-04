@@ -104,7 +104,7 @@ object Chat {
                             author: String,
                             time: Long,
                             msg: String) extends ChatMsg
-  case class ChatCreate(userId:UserID,members: List[String]) extends ChatMsg
+  case class ChatCreate(userId:UserID,members: Set[String]) extends ChatMsg
   case class SetChatOrGroupName(chatId: ChatID, name: String) extends ChatMsg
 
 

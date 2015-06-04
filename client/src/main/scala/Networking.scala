@@ -106,7 +106,7 @@ class Networking(val uid:Long) {
   def getFriends =
     send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends("APPID",uid)))
 
-  def createChat(friendJIds: List[String]) =
+  def createChat(friendJIds: Set[String]) =
     send(io.surfkit.model.Socket.Op("chat","create", Chat.ChatCreate(Auth.UserID(uid), friendJIds)))
 
   def getChatHistory(cid:Long) =
