@@ -102,6 +102,7 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
         cid <- createOrGetChatId(userId,jid,memberSet)
         chat <- getChat(cid)
       }yield{
+        println(s"ChatCreate $cid, $chat")
         rooms += cid -> chat
         Api.Result(0, r.module, r.op,  upickle.write(chat), r.routing)
       }

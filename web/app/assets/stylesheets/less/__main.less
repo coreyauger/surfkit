@@ -12,9 +12,20 @@ html{
         bottom: 0px;
         display: flex;
         .chat {
+          position: relative;
+          box-shadow: 5px 7px 5px #888888 !important;
           .panel;
           .panel-default;
-          header{
+          >header{
+
+            >span{
+              padding: 5px 10px;
+              color: @input-color;
+              text-overflow: ellipsis;
+            }
+            >i{
+              color: @input-color;
+            }
             .panel-heading;
             position: relative;
             border-bottom: 1px solid @panel-inner-border;
@@ -24,22 +35,58 @@ html{
               right: 10px;
             }
           }
+          .friend-list{
+            position: absolute;
+            > div{
+              .list-group;
+              background-color: @panel-bg;
+              .friend-card{
+                :hover{
+                  background-color:  @panel-inner-border;
+                }
+                border-bottom: 1px solid  @panel-inner-border;
+                .list-group-item;
+                .avatar{
+                  width: 32px;
+                  height: 32px;
+                }
+              }
+            }
+          }
           margin-left: 20px;
           margin-bottom: 0px;
           width: 250px;
           .entries{
-            height: 200px;
+            height: 250px;
             overflow-x: hidden;
             overflow-wrap: break-word;
             .entry{
+              display:flex;
+              :last-child{
+                flex: 1 100%;
+              }
               .avatar{
-                >img {
-                  width: 32px;
-                  height: 32px;
-                  border-radius: 16px;
-                  border: 2px solid white;
-                  margin: 5px;
-                }
+                width: 36px;
+                height: 36px;
+                border-radius: 5px;
+                border: 2px solid white;
+                margin: 5px;
+              }
+              span{
+                margin-left: 5px;
+                margin-top: 5px;
+                font-size: 12px;
+                display: block;
+              }
+              .uname{
+                font-weight: bold;
+                display:inline-block;
+              }
+              .time{
+                font-weight: bold;
+                display:inline-block;
+                color: @panel-inner-border;
+                text-transform: uppercase;
               }
             }
           }
@@ -66,20 +113,23 @@ html{
           .tools {
             padding: 5px;
           }
-          .friend-card {
-            padding: 10px;
-            .avatar {
-              width: 48px;
-              height: 48px;
-              border-radius: 24px;
-              border: 2px solid white;
-            }
-            span {
-              margin-left: 10px;
-            }
-          }
         }
       }
     }
+
+
+    .friend-card {
+      padding: 10px;
+      .avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 24px;
+        border: 2px solid white;
+      }
+      span {
+        margin-left: 10px;
+      }
+    }
+
   }
 }
