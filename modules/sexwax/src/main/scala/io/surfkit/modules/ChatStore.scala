@@ -219,7 +219,7 @@ trait ChatStore extends PostgresService {
     ).use(id, limit, offset).getRows[Chat.DbEntry]
   }
 
-  def getChatEntriesForChats(chatIds:Seq[ChatID], date: Date, limit: Int = 25):Future[Seq[Chat.DbEntry]] = {
+  def getChatEntriesForChats(chatIds:Seq[Long], date: Date, limit: Int = 25):Future[Seq[Chat.DbEntry]] = {
     Q(
       """
         |SELECT DISTINCT ON (ce.chatentry_chat_key) *

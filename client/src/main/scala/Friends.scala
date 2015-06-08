@@ -1,7 +1,7 @@
 package io.surfkit.client
 
 import io.surfkit.model.Auth
-import japgolly.scalajs.react.ReactComponentB
+import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.prefix_<^._
 
 trait Friends {
@@ -17,16 +17,23 @@ object Friends{
   case class FriendEvents(onFilterChange:ReactEvent, onFriendSelect:FriendSelectEvent, onFriendAddEvent:FriendAddEvent)
   case class FriendsState(friends:Seq[Auth.ProfileInfo], filter:String, events:FriendEvents)
 
-
   val FriendCard = ReactComponentB[(Auth.ProfileInfo, FriendSelectEvent)]("FriendCard")
     .render(props => {
       val (friend,onSelect) = props
-      <.div(^.className:="friend-card",^.onClick --> onSelect(friend),
-        <.img(^.src:= friend.avatarUrl, ^.className:="avatar"),
-        <.span(friend.fullName)
-      )
-    })
-    .build
+      //<.div(^.className:="friend-card",^.onClick --> onSelect(friend),
+      <.div(^.className:="friend-card",^.onClick ==> ((r:ReactEventI) => {
+        r.target.className =
+          if(r.target.className.contains(" active"))
+            r.target.className.replace(" active","")
+          else
+            r.target.className + " active"
+        onSelect(friend)
+      }) ,
+          <.img(^.src:= friend.avatarUrl, ^.className:="avatar"),
+          <.span(friend.fullName)
+        )
+      })
+      .build
 
   val FriendList = ReactComponentB[(FriendsState)]("FriendList")
     .render(props => {
@@ -59,7 +66,11 @@ object Friends{
           },"fa fa-plus") )
         ),
         <.div(friendList.map(f => FriendCard( (f,(friend:Auth.ProfileInfo)=>{
-          members =  members + friend
+          members =
+            if( members.contains(friend) )
+              members - friend
+            else
+              members + friend
         }) ) ))
       )
     })

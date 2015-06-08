@@ -7,6 +7,35 @@ html{
   body {
 
     .chat-module {
+      .entry{
+        display:flex;
+        :last-child{
+          flex: 1 100%;
+        }
+        .avatar{
+          width: 36px;
+          height: 36px;
+          border-radius: 5px;
+          border: 2px solid white;
+          margin: 5px;
+        }
+        span{
+          margin-left: 5px;
+          margin-top: 5px;
+          font-size: 12px;
+          display: block;
+        }
+        .uname{
+          font-weight: bold;
+          display:inline-block;
+        }
+        .time{
+          font-weight: bold;
+          display:inline-block;
+          color: @panel-inner-border;
+          text-transform: uppercase;
+        }
+      }
       .chats {
         position: fixed;
         bottom: 0px;
@@ -17,8 +46,10 @@ html{
           .panel;
           .panel-default;
           >header{
-
+            display: flex;
+            flex-wrap: nowrap;
             >span{
+              flex-grow: 1;
               padding: 5px 10px;
               color: @input-color;
               text-overflow: ellipsis;
@@ -27,15 +58,11 @@ html{
             }
             >i{
               color: @input-color;
+              padding: 10px;
             }
             .panel-heading;
             position: relative;
             border-bottom: 1px solid @panel-inner-border;
-            :last-child{
-              position: absolute;
-              top:3px;
-              right: 10px;
-            }
           }
           .friend-list{
             position: absolute;
@@ -53,6 +80,9 @@ html{
                   height: 32px;
                 }
               }
+              .friend-card.active{
+                background-color: @panel-success-heading-bg;
+              }
             }
           }
           margin-left: 20px;
@@ -66,35 +96,6 @@ html{
               text-align: center;
               i{
                 padding:5px;
-              }
-            }
-            .entry{
-              display:flex;
-              :last-child{
-                flex: 1 100%;
-              }
-              .avatar{
-                width: 36px;
-                height: 36px;
-                border-radius: 5px;
-                border: 2px solid white;
-                margin: 5px;
-              }
-              span{
-                margin-left: 5px;
-                margin-top: 5px;
-                font-size: 12px;
-                display: block;
-              }
-              .uname{
-                font-weight: bold;
-                display:inline-block;
-              }
-              .time{
-                font-weight: bold;
-                display:inline-block;
-                color: @panel-inner-border;
-                text-transform: uppercase;
               }
             }
           }
@@ -114,7 +115,7 @@ html{
         position: fixed;
         top: 0px;
         right: 0px;
-        width: 200px;
+        width: 250px;
         bottom: 0px;
         border-left: 1px solid #ccc;
         .friend-list {

@@ -17,6 +17,7 @@ trait PostgresService {
   val dateFormatUtc: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
   dateFormatUtc.setTimeZone(TimeZone.getTimeZone("UTC"))
 
+  def strToDate(s:String) = dateFormatUtc.parse(s)
 
   private val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/sktest?user=postgres&password=Neverdull42")
   private val factory = new PostgreSQLConnectionFactory( configuration )

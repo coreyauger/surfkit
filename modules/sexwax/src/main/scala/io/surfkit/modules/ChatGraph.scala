@@ -4,7 +4,7 @@ import java.util.{Date, UUID}
 
 import akka.util.Timeout
 import core.common.NeoService
-import io.surfkit.model.Chat.ChatID
+import io.surfkit.model.Chat.{ChatMember, ChatID}
 import io.surfkit.model.Auth.{UserID, ProfileInfo}
 import play.api.libs.json._
 import scala.concurrent.duration._
@@ -28,6 +28,7 @@ trait ChatGraph extends NeoService {
 
 
   implicit val pr =  Json.reads[ProfileInfo]
+  implicit val cmr =  Json.reads[ChatMember]
 
   def createNeo4JConstrains() = {
     implicit val timeout:Timeout = new Timeout(5 seconds)
@@ -58,7 +59,7 @@ trait ChatGraph extends NeoService {
   def getMembers(chatId: ChatID) = getMembersQ(chatId).getMultiple[String]("uid")
 
 
-  def getUnreadChats( uid: String ) =
+  def getUnreadChats( uid: Long ) =
     Q(
       """
         |MATCH (u:User {uid:{uid}})-[r:UNREAD]->(c:Chat)
@@ -66,13 +67,24 @@ trait ChatGraph extends NeoService {
       """
     ).use( "uid" -> uid).getManyJs
 
-  def getChatsContainingUser( uid: String ): Future[Seq[ChatID]] =
+  def getChatMembersContainingUser( uid: Long ): Future[Seq[Chat.ChatMember]] =
     Q(
       """
-        |MATCH (u:User {uid:{uid}})-[:MEMBER_OF]->(c:Chat)
-        |RETURN c.id as chatId
+        |MATCH (:User {uid:{uid}})-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(:Provider)-[:MEMBER_OF]->(c:Chat)
+        |MATCH (p:Provider)-[:MEMBER_OF]->(c:Chat)
+        |RETURN c.id as chatId,  p.name as provider, p.id as id, p.fullName as fullName, p.email as email, p.jid as jid, p.avatarUrl as avatarUrl;
       """
-    ).use("uid" -> uid).getMultiple[ChatID]("chatId")
+    ).use("uid" -> uid).getMany[Chat.ChatMember]
+
+
+
+  def getChatsContainingUser( uid: Long ): Future[Seq[Chat.ChatID]] =
+    Q(
+      """
+        |MATCH (:User {uid:{uid}})-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(:Provider)-[:MEMBER_OF]->(c:Chat)
+        |RETURN c.id as chatId;
+      """
+    ).use("uid" -> uid).getMultiple[Chat.ChatID]("chatId")
 
   def setChatOrGroupNameQ(id: ChatID, name: String) =
     Q(
@@ -84,7 +96,7 @@ trait ChatGraph extends NeoService {
     ).use("id" -> id.toString, "name" -> name)
   def setChatOrGroupName(chatId: ChatID, name: String) = setChatOrGroupNameQ(chatId, name).getOneJs
 
-  def getGroups(userId: String) =
+  def getGroups(userId: Long) =
     Q(
       """
         | MATCH
@@ -94,30 +106,30 @@ trait ChatGraph extends NeoService {
     ).use("uid" -> userId).getManyJs
 
 
-  def connectMemberQ(chatId: ChatID, userId: String) =
+  def connectMemberQ(chatId: ChatID, jid: String) =
     Q(
       """
-        MATCH (u:User), (c: Chat)
-        WHERE u.uid={userId} AND c.id={chatId}
+        MATCH (p:Provider), (c: Chat)
+        WHERE p.jid={jid} AND c.id={chatId}
         CREATE UNIQUE (u)-[r:MEMBER_OF]->(c)
         RETURN r
       """
-    ).use("chatId" -> chatId.toString, "userId" -> userId)
-  def connectMember(chatId: ChatID, userId: String) = connectMemberQ(chatId, userId).getOneJs
+    ).use("chatId" -> chatId, "jid" -> jid)
+  def connectMember(chatId: ChatID, jid: String) = connectMemberQ(chatId, jid).getOneJs
 
-  def connectMembersQ(chatId: ChatID, users: Seq[String]) = {
-    val usersArr = users.mkString("[", ",", "]")
+  def connectMembersQ(chatId: ChatID, jids: Seq[String]) = {
+    val jidsStr = jids.mkString("[", ",", "]")
     Q(
       s"""
-        MATCH (u:User), (c: Chat)
-        WHERE u.uid IN $usersArr
+        MATCH (p:Provider), (c: Chat)
+        WHERE p.jid IN $jidsStr
         AND c.id={chatId}
-        CREATE UNIQUE (u)-[r:MEMBER_OF]->(c)
+        CREATE UNIQUE (p)-[r:MEMBER_OF]->(c)
         RETURN r
       """
     ).use("chatId" -> chatId.toString)
   }
-  def connectMembers(chatId: ChatID, userId: String) = connectMemberQ(chatId, userId).getOneJs
+  def connectMembers(chatId: ChatID, jids: Seq[String]) = connectMembersQ(chatId, jids).getOneJs
 
   def createChatNodeQ(chatId: ChatID, owner: UserID, members: Set[String]) =
     Q(

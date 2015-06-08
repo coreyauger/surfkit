@@ -1,6 +1,6 @@
 package io.surfkit.model
 
-import io.surfkit.model.Auth.UserID
+import io.surfkit.model.Auth.{ProfileInfo, UserID}
 
 sealed trait Model
 
@@ -78,7 +78,18 @@ object Auth{
     val UserPassword = AuthenticationMethod("userPassword")
   }
 
-  case class ProfileInfo(provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String)
+  sealed trait BaseProfile extends Model{
+    def provider: String
+    def id: String
+    def fullName: String
+    def email: String
+    def jid: String
+    def avatarUrl: String
+  }
+  case class ProfileInfo(provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String) extends BaseProfile
+
+  def UnknowProfile =
+    ProfileInfo("","","Unknown","","","/assets/images/avatar.png")
 
 }
 
@@ -95,11 +106,11 @@ object Chat {
   case class CreateGroup(name: String, permission: Short, members: List[String]) extends ChatMsg
   case class ChatPresenceRequest(jid: String, status: String) extends ChatMsg
   case class ChatPresenceResponse(jid: String, status: String) extends ChatMsg
-  case class GetChatList(uid:UserID, since: String) extends ChatMsg
+  case class GetRecentChatList(uid:Long, since: String) extends ChatMsg
   case class GetHistory(chatId: ChatID, maxId: Option[Long] = None, offset: Option[Long] = None) extends ChatMsg
   case class GetChat(chatId: ChatID) extends ChatMsg
   case class GetUserGroups() extends ChatMsg
-  case class MemberJoin(chatId: ChatID, memberId: String) extends ChatMsg
+  case class MemberJoin(chatId: ChatID, jid: String) extends ChatMsg
   case class ChatSend(userId:UserID,
                             chatId: ChatID,
                             author: String,
@@ -113,6 +124,18 @@ object Chat {
   case class DbEntry(chatid:Long, chatentryid:Long, jid:String, timestamp:Long, provider:Short, json:String) extends ChatMsg
   case class ChatEntry(chatid:Long, chatentryid:Long, timestamp:Long, provider:Short, json:String, from:Auth.ProfileInfo) extends ChatMsg
   case class Chat(chatid:Long, members:Seq[Auth.ProfileInfo], entries:Seq[ChatEntry]) extends ChatMsg
+  case class ChatMember (chatId:Long, provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String) extends Auth.BaseProfile
+
+
+  object ChatEntry{
+    def create(e:DbEntry, a:Auth.ProfileInfo):ChatEntry =
+      ChatEntry(e.chatid,e.chatentryid,e.timestamp, e.provider, e.json, a)
+  }
+
+
+  object ChatMember{
+    implicit def toProfileInfo(c:ChatMember) = ProfileInfo(c.provider,c.id, c.fullName, c.email, c.jid, c.avatarUrl)
+  }
 }
 
 

@@ -12,17 +12,15 @@ import scala.scalajs.js.JSON
  */
 trait Chat{
 
-  //implicit val $:BackendScope[Unit, ChatState]
-  //implicit val socket:Networking
-
-
 }
 
 object Chat{
+  type ChatToUnit = (io.surfkit.model.Chat.Chat) => Unit
   type SendChatMessage = (io.surfkit.model.Chat.Chat, String) => Unit
   type ChatMessageChange = (io.surfkit.model.Chat.Chat, String) => Unit
-  type ChatCloseEvent = (io.surfkit.model.Chat.Chat) => Unit
-  type ChatShowAddFriends = (io.surfkit.model.Chat.Chat) => Unit
+  type ChatCloseEvent = ChatToUnit
+  type ChatShowAddFriends = ChatToUnit
+  type ChatSelect = ChatToUnit
 
   case class ChatEvents(onMessageChange:ChatMessageChange, onSendMessage:SendChatMessage, onChatClose:ChatCloseEvent, onShowAddFriends:ChatShowAddFriends)
   case class ChatState(chat:io.surfkit.model.Chat.Chat, events:ChatEvents, ui:String, msg:String, friendState:FriendsState)
@@ -30,7 +28,6 @@ object Chat{
   object ChatUI{
     final val ShowAddFriend = "addFriends "
   }
-
 
 
   val ChatEntry= ReactComponentB[(io.surfkit.model.Chat.ChatEntry)]("ChatEntry")
@@ -48,6 +45,21 @@ object Chat{
           <.span(^.className:="time",date.toLocaleString),
           <.span(dyn.msg.toString)
         )
+      )
+    })
+    .build
+
+
+  val RecentChatList = ReactComponentB[(Seq[io.surfkit.model.Chat.Chat], ChatSelect)]("RecentChatList")
+    .render(props => {
+      val (chats, onChatSelect) = props
+      <.div(^.className:="chat-recent",
+        chats.filter(_.entries.length > 0).map{
+          c =>
+            <.div(^.onClick --> onChatSelect(c),
+              ChatEntry( (c.entries.head) )
+            )
+        }
       )
     })
     .build
@@ -110,7 +122,5 @@ object Chat{
       )
     })
     .build
-
-
 
 }

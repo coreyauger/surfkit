@@ -1,6 +1,5 @@
 package io.surfkit.client
 
-import io.surfkit.model.Chat
 import io.surfkit.model._
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.vdom.prefix_<^._
@@ -26,7 +25,8 @@ object SurfKitAppReact extends JSApp{
   import io.surfkit.client.Chat._
   import io.surfkit.client.Friends._
 
-  case class State(friendState:FriendsState, chatState: Seq[ChatState], items: List[String], text: String)
+  type TabSelect = (String) => Unit
+  case class State(friendState:FriendsState, chatState: Seq[ChatState], recentChats:List[io.surfkit.model.Chat.Chat], tabState: String)
 
 
   class Backend($: BackendScope[Unit, State], socket:Networking) extends Object with io.surfkit.client.Chat {
@@ -37,6 +37,21 @@ object SurfKitAppReact extends JSApp{
       $.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == chat.chatid) cs else c)))
     }
 
+    def openChat(c:io.surfkit.model.Chat.Chat) = {
+      // check if this chat was already created.. and if so just set the focus...
+      implicit val chat = c
+      val setFocus = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
+        c =>
+          // just set focus..
+          true
+      }.orElse[Boolean]{
+        println(s"chat create.. $chat")
+        socket.getChatHistory(chat.chatid)  // request some chat history...
+        $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, createChatEvents, "","",$.state.friendState.copy(events = FriendEvents(onChatFilterChange, null, onFriendsAddToChat))) ))
+        Some(false)
+      }
+    }
+
     socket.addResponder("auth","friends"){
       f =>
         val friends = upickle.read[Seq[Auth.ProfileInfo]](f)
@@ -45,32 +60,26 @@ object SurfKitAppReact extends JSApp{
     }
     socket.addResponder("chat","create"){
       f =>
-        implicit val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
-        // check if this chat was already created.. and if so just set the focus...
-        val setFocus = $.state.chatState.filter(_.chat.chatid == chat.chatid).headOption.map{
-          c =>
-            // just set focus..
-            true
-        }.orElse[Boolean]{
-          println(s"chat create.. $chat")
-          socket.getChatHistory(chat.chatid)  // request some chat history...
-          $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, createChatEvents, "","",$.state.friendState.copy(events = FriendEvents(onChatFilterChange, null, onFriendsAddToChat))) ))
-          Some(false)
-        }
+        val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
+        openChat(chat)
     }
     socket.addResponder("user","chat-send"){
       f =>
         val entry = upickle.read[io.surfkit.model.Chat.ChatEntry](f)
         println(s"GOT A CHAT SEND .. $entry")
         // TODO: need to watch this and see if this turns into a massive copy operation??
+        val toUpdate = $.state.recentChats.filter(_.chatid == entry.chatid)
+                          .headOption.map(c => io.surfkit.model.Chat.Chat(c.chatid, c.members, Seq(entry)))
+                          .getOrElse(io.surfkit.model.Chat.Chat(entry.chatid, Seq(entry.from), Seq(entry)))
+        val newRecentChats = toUpdate :: $.state.recentChats.filter(_.chatid != entry.chatid)
         val (cs,alreadyOpen) = $.state.chatState.filter(_.chat.chatid == entry.chatid).headOption.map{
           c =>
             (ChatState(c.chat.copy(entries = c.chat.entries :+ entry),c.events, c.ui, c.msg, c.friendState),true)
         }.getOrElse[(ChatState,Boolean)]( (ChatState(io.surfkit.model.Chat.Chat(entry.chatid,Nil,Seq(entry)), createChatEvents,"", "",$.state.friendState.copy(events = FriendEvents(null, null, onFriendsAddToChat)) ),false)) // TODO: is null safe for events ??
-        if(alreadyOpen)$.modState(s => s.copy(chatState = s.chatState.map(c =>if(c.chat.chatid == entry.chatid) cs else c)))
+        if(alreadyOpen)$.modState(s => s.copy(recentChats = newRecentChats, chatState = s.chatState.map(c =>if(c.chat.chatid == entry.chatid) cs else c)))
         else{
           socket.getChatHistory(entry.chatid)
-          $.modState(s => s.copy(chatState = s.chatState.filter(_.chat.chatid != entry.chatid) :+ cs ))
+          $.modState(s => s.copy(recentChats = newRecentChats, chatState = s.chatState.filter(_.chat.chatid != entry.chatid) :+ cs ))
         }
     }
     socket.addResponder("chat","history"){
@@ -79,12 +88,25 @@ object SurfKitAppReact extends JSApp{
         // TODO: compact enties from same user in same relitive time
         modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg, c.friendState.copy(events = c.friendState.events.copy(onFilterChange = onChatFilterChange))))
     }
+    socket.addResponder("chat","list"){
+      f =>
+        val history = upickle.read[List[io.surfkit.model.Chat.Chat]](f)
+          $.modState(c => c.copy(recentChats = history))
+    }
 
     // ask for friends...
     socket.getFriends
+    socket.getRecentChatList
 
     def createChatEvents = ChatEvents(onChatMessageChange,onSendChatMessage,onChatClose,onShowAddFriends)
 
+
+    def onChatSelect(c:io.surfkit.model.Chat.Chat):Unit = openChat(c)
+
+
+    def onTabChange(title:String):Unit = {
+      $.modState( c => c.copy(tabState = title))
+    }
 
     def onShowAddFriends(chat:io.surfkit.model.Chat.Chat):Unit = {
       modChatState(chat)(c =>ChatState(c.chat, c.events,
@@ -132,18 +154,14 @@ object SurfKitAppReact extends JSApp{
       socket.createChat(Set(f.jid))
     }
 
-    def handleSubmit(e: ReactEventI) = {
-      e.preventDefault()
-      $.modState(s => s.copy(items = s.items :+ s.text))
-    }
   }
 
   val SurfKitApp = ReactComponentB[Unit]("SurfKitApp")
-    .initialState(State(FriendsState(Nil,"",FriendEvents(null,null,null)), Nil,  Nil, ""))
+    .initialState(State(FriendsState(Nil,"",FriendEvents(null,null,null)), Nil,  Nil, "Friends"))
     .backend(s => new Backend(s, new Networking(Environment.userId)))
     .render((_,S,B) =>
       <.div(
-        ChatModule((S.chatState,S.friendState))
+        ChatModule((S.chatState,S.friendState, S.recentChats, S.tabState, B))
       )
     ).buildU
 
@@ -151,16 +169,22 @@ object SurfKitAppReact extends JSApp{
 
 
 
-  val ChatModule = ReactComponentB[(Seq[ChatState],FriendsState)]("ChatApp")
+  val ChatModule = ReactComponentB[(Seq[ChatState],FriendsState, Seq[io.surfkit.model.Chat.Chat], String, Backend)]("ChatApp")
     .render(props => {
-      val (cs,fs) = props
+      val (cs,fs, recent, selectedTab,b) = props
+      def makeTab(title:String) =
+        <.li(^.role:="presentation", ^.onClick -->b.onTabChange(title), ^.className:=
+          (if (selectedTab.contains(title))"active" else ""),<.a(^.href:="#",title))
       <.div(^.className:="chat-module",
         <.div(^.className:="chat-cnt",
           <.ul(^.className:="nav nav-tabs",
-            <.li(^.role:="presentation", ^.className:="active",<.a(^.href:="#","Friends")),
-            <.li(^.role:="presentation",<.a(^.href:="#","History"))
+            makeTab("Friends"),
+            makeTab("History")
           ),
-          FriendList( (fs) )
+          selectedTab match{
+            case "Friends" => FriendList( (fs) )
+            case "History" => RecentChatList( (recent, b.onChatSelect) )
+          }
         ),
         Chats( (cs) )
       )
