@@ -20,6 +20,7 @@ object Environment{
 
 object SurfKitAppReact extends JSApp{
 
+  implicit val applicationID = "surfkit.io"
 
   import io.surfkit.client.Base._
   import io.surfkit.client.Chat._
@@ -30,6 +31,11 @@ object SurfKitAppReact extends JSApp{
 
 
   class Backend($: BackendScope[Unit, State], socket:Networking) extends Object with io.surfkit.client.Chat {
+
+
+    val reportFailure:scala.PartialFunction[scala.Throwable, Unit] = {
+      case t:Throwable => println("An error has occured: " + t.getMessage)
+    }
 
     def modChatState(c:io.surfkit.model.Chat.Chat)(f: (ChatState) => ChatState ) = {
       implicit val chat = c
@@ -46,23 +52,16 @@ object SurfKitAppReact extends JSApp{
           true
       }.orElse[Boolean]{
         println(s"chat create.. $chat")
-        socket.getChatHistory(chat.chatid)  // request some chat history...
+        socket.getChatHistory(chat.chatid).map { c => // request some chat history...
+          implicit val chat = c
+          // TODO: compact enties from same user in same relitive time
+          modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg, c.friendState.copy(events = c.friendState.events.copy(onFilterChange = onChatFilterChange))))
+        }.onFailure(reportFailure)
         $.modState(s => s.copy(chatState = s.chatState :+ ChatState(chat, createChatEvents, "","",$.state.friendState.copy(events = FriendEvents(onChatFilterChange, null, onFriendsAddToChat))) ))
         Some(false)
       }
     }
 
-    socket.addResponder("auth","friends"){
-      f =>
-        val friends = upickle.read[Seq[Auth.ProfileInfo]](f)
-        println(s"friends.. $friends")
-        $.modState(s => s.copy(friendState = FriendsState(friends,"",FriendEvents(onFilterChange,onFriendSelect, null))))
-    }
-    socket.addResponder("chat","create"){
-      f =>
-        val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
-        openChat(chat)
-    }
     socket.addResponder("user","chat-send"){
       f =>
         val entry = upickle.read[io.surfkit.model.Chat.ChatEntry](f)
@@ -78,28 +77,25 @@ object SurfKitAppReact extends JSApp{
         }.getOrElse[(ChatState,Boolean)]( (ChatState(io.surfkit.model.Chat.Chat(entry.chatid,Nil,Seq(entry)), createChatEvents,"", "",$.state.friendState.copy(events = FriendEvents(null, null, onFriendsAddToChat)) ),false)) // TODO: is null safe for events ??
         if(alreadyOpen)$.modState(s => s.copy(recentChats = newRecentChats, chatState = s.chatState.map(c =>if(c.chat.chatid == entry.chatid) cs else c)))
         else{
-          socket.getChatHistory(entry.chatid)
+          socket.getChatHistory(entry.chatid).map { c => // request some chat history...
+            implicit val chat = c
+            // TODO: compact enties from same user in same relitive time
+            modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg, c.friendState.copy(events = c.friendState.events.copy(onFilterChange = onChatFilterChange))))
+          }.onFailure(reportFailure)
           $.modState(s => s.copy(recentChats = newRecentChats, chatState = s.chatState.filter(_.chat.chatid != entry.chatid) :+ cs ))
         }
     }
-    socket.addResponder("chat","history"){
-      f =>
-        implicit val chat = upickle.read[io.surfkit.model.Chat.Chat](f)
-        // TODO: compact enties from same user in same relitive time
-        modChatState(chat)(c =>ChatState(c.chat.copy(members = chat.members, entries = c.chat.entries ++ chat.entries.reverse),c.events, c.ui, c.msg, c.friendState.copy(events = c.friendState.events.copy(onFilterChange = onChatFilterChange))))
-    }
-    socket.addResponder("chat","list"){
-      f =>
-        val history = upickle.read[List[io.surfkit.model.Chat.Chat]](f)
-          $.modState(c => c.copy(recentChats = history))
-    }
 
-    // ask for friends...
-    socket.getFriends
-    socket.getRecentChatList
+    socket.getFriends.map(friends =>
+      $.modState(s => s.copy(friendState = FriendsState(friends,"",FriendEvents(onFilterChange,onFriendSelect, null))))
+    ).onFailure(reportFailure)
+
+    socket.getRecentChatList.map(history =>
+      $.modState(c => c.copy(recentChats = history))
+    ).onFailure(reportFailure)
+
 
     def createChatEvents = ChatEvents(onChatMessageChange,onSendChatMessage,onChatClose,onShowAddFriends)
-
 
     def onChatSelect(c:io.surfkit.model.Chat.Chat):Unit = openChat(c)
 
@@ -127,7 +123,6 @@ object SurfKitAppReact extends JSApp{
       socket.sendChatMessage(chat.chatid,msg)
       modChatState(chat)(c =>ChatState(c.chat,c.events, c.ui, "", c.friendState))
       // TODO: show a ghosted msg that gets filled in when we get result from server..
-
     }
 
     def onFilterChange(e: ReactEventI):Unit = {
@@ -141,7 +136,7 @@ object SurfKitAppReact extends JSApp{
     }
 
     def onFriendsAddToChat(friends:Set[Auth.ProfileInfo]):Unit = {
-      socket.createChat(friends.map(_.jid))
+      socket.createChat(friends.map(_.jid)).map(openChat(_)).onFailure(reportFailure)
       // close the friend adder ui
       $.modState(_.copy(chatState = $.state.chatState.map(c => c.copy(ui = c.ui.replace(ChatUI.ShowAddFriend,"")))))
     }
@@ -151,7 +146,7 @@ object SurfKitAppReact extends JSApp{
       println(s"You selected ${f.jid}")
       // we want to create a chat with this friend now...
       // check if chat is already open..
-      socket.createChat(Set(f.jid))
+      socket.createChat(Set(f.jid)).map(openChat(_)).onFailure(reportFailure)
     }
 
   }
