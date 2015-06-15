@@ -176,6 +176,10 @@ object HangTenSlick{
   def getProvider(app:String, providerId: String, userId: String) = {
     db.run( providers.filter { p => (p.appId === app && p.providerId === providerId && p.userId === userId)}.result )
   }
+  def getProviderForUser(uId:Long, app:String, providerId: String) = {
+    db.run( providers.filter { p => (p.appId === app && p.providerId === providerId && p.userKey === uId)}.result )
+  }
+
   def saveProvider(p:Auth.ProviderProfile):Future[Long] = {
     println("RUNNING SAVE")
     val userId = (users returning users.map(_.id)) += Auth.SurfKitUser(0,"token", p.fullName, p.avatarUrl,p.email)

@@ -64,6 +64,7 @@ object Auth{
   case class Echo(msg:String, users:List[Long]) extends  Model
 
   case class FindUser(appId: String, providerId:String, userId:String) extends Model
+  case class GetProvider(uId:Long, appId:String, provider:String)  extends Model
   case class GetFriends(appId: String, userId:Long ) extends Model
   case class SaveResponse(userId: Long) extends Model
   case class OAuth1Info(token: String, secret: String) extends Model

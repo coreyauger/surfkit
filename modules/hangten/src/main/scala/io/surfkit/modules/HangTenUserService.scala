@@ -35,6 +35,22 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           Api.Result(1, r.module, r.op, "",r.routing)
       }
 
+
+
+    case Auth.GetProvider(uId:Long, appId:String, providerId: String) =>
+      logger.debug(s"Auth.GetProvider($uId, $appId, $providerId)")
+      HangTenSlick.getProviderForUser(uId, appId, providerId).map {
+        case provider: Seq[HangTenSlick.FlatProviderProfile] =>
+          Api.Result(0,
+            r.module,
+            r.op,
+            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)),r.routing)
+      }.recover {
+        case _ =>
+          Api.Result(1, r.module, r.op, "",r.routing)
+      }
+
+
     case p:Auth.ProviderProfile =>
       // this is a save or an update operation...
       HangTenSlick.getProvider(p.appId, p.providerId, p.userId).flatMap{
@@ -87,6 +103,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
     println("IN THE MAPPER ...")
     r.op match {
       case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
+      case "provider" => actions(r)(upickle.read[Auth.GetProvider](r.data.toString))
       case "save" => actions(r)(upickle.read[Auth.ProviderProfile](r.data.toString))
       case "friends" => actions(r)(upickle.read[Auth.GetFriends](r.data.toString))
       case "actor" => actions(r)(upickle.read[Auth.CreateActor](r.data.toString))
