@@ -184,6 +184,7 @@ lazy val coreDeps = {
   val akkaV = "2.3.9"
   val sprayV = "1.3.3"
   val akkaStreamV = "1.0-M5"
+  //val akkaStreamV = "1.0-RC3" TODO: ...
   val scalaTestV = "2.2.1"
   Seq(
     ws,

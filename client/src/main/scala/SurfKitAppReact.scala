@@ -151,11 +151,15 @@ object SurfKitAppReact extends JSApp{
 
   }
 
+
+
+
   val SurfKitApp = ReactComponentB[Unit]("SurfKitApp")
     .initialState(State(FriendsState(Nil,"",FriendEvents(null,null,null)), Nil,  Nil, "Friends"))
     .backend(s => new Backend(s, new Networking(Environment.userId)))
     .render((_,S,B) =>
       <.div(
+        SiteHeader( ("surfkit") ),
         ChatModule((S.chatState,S.friendState, S.recentChats, S.tabState, B))
       )
     ).buildU
@@ -163,8 +167,20 @@ object SurfKitAppReact extends JSApp{
   // TODO: factor these controls out into the Chat object...
 
 
+  val SiteHeader = ReactComponentB[(String)]("SiteHeader")
+    .render(props => {
+      val (title) = props
+      <.header(^.className:="site",
+        <.div(^.className:="wrapper",
+          <.div(^.className:="content","HELLO")
+        )
+      )
+    })
+    .build
 
-  val ChatModule = ReactComponentB[(Seq[ChatState],FriendsState, Seq[io.surfkit.model.Chat.Chat], String, Backend)]("ChatApp")
+
+
+  val ChatModule = ReactComponentB[(Seq[ChatState],FriendsState, Seq[io.surfkit.model.Chat.Chat], String, Backend)]("ChatModule")
     .render(props => {
       val (cs,fs, recent, selectedTab,b) = props
       def makeTab(title:String) =

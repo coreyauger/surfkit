@@ -5,8 +5,31 @@
 
 html{
   body {
+    background-color: #fafafa;
+
+    header.site{
+      height: 42px;
+      width: 100%;
+      position: fixed;
+      top: 0px;
+      left: 0px;
+      right: 0px;
+      background-color: @panel-bg;
+      box-shadow: 2px 2px 10px #888;
+      z-index:100;
+
+    }
+    div.wrapper{
+      display: flex;
+      justify-content: center;
+      div.content {
+        width: 100%;
+        max-width: 987px;
+      }
+    }
 
     .chat-module {
+      background-color: white;
       .entry{
         display:flex;
         :last-child{
@@ -66,6 +89,7 @@ html{
           }
           .friend-list{
             position: absolute;
+            background-color: @panel-bg;
             > div{
               .list-group;
               background-color: @panel-bg;
@@ -76,8 +100,8 @@ html{
                 border-bottom: 1px solid  @panel-inner-border;
                 .list-group-item;
                 .avatar{
-                  width: 32px;
-                  height: 32px;
+                  width: 24px;
+                  height: 24px;
                 }
               }
               .friend-card.active{
@@ -100,6 +124,7 @@ html{
             }
           }
           .cntrls{
+
             :first-child{
               border-radius: 0px;
               border-left:0px;
@@ -112,10 +137,11 @@ html{
         }
       }
       .chat-cnt {
+
         position: fixed;
-        top: 0px;
+        top: 42px;
         right: 0px;
-        width: 250px;
+        width: 200px;
         bottom: 0px;
         border-left: 1px solid #ccc;
         .friend-list {
@@ -128,11 +154,13 @@ html{
 
 
     .friend-card {
-      padding: 10px;
+      padding: 5px;
+      background-color: @panel-bg;
+      height: 100%;
       .avatar {
-        width: 48px;
-        height: 48px;
-        border-radius: 24px;
+        width: 36px;
+        height: 36px;
+        border-radius: 18px;
         border: 2px solid white;
       }
       span {
