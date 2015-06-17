@@ -24,6 +24,21 @@ trait NeoService {
   }
 
 
+  def batchCypher(statments: List[String])(implicit neoServer:Neo4JServer): Future[JsValue] = {
+    val jsonStatments: List[JsValue] = statments.map{
+      case s:String =>  Json.obj("statement" -> s)
+    }
+    val req = ws.url(neoServer.url("transaction/commit"))
+      .withHeaders( ("Accept","application/json; charset=UTF-8"), ("Content-Type", "application/json") )
+      .post(Json.obj("statements" -> jsonStatments))
+    req.map { res =>
+      println(res.json)
+      res.json
+    }
+  }
+
+
+
   case class Q(q: String, params: JsObject = Json.obj()) {
 
     type Cols = List[String]
