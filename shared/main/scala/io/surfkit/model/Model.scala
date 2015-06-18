@@ -183,7 +183,7 @@ object Api {
 
 object Max {
   case class SearchNext(api:String, next:String)extends Model
-  case class Search(category:String, query:String, lat:Double, lng:Double, next: Option[List[SearchNext]] = None) extends Model
+  case class Search(category:String, query:String, members:Set[Long], lat:Double, lng:Double, next: Option[List[SearchNext]] = None) extends Model
   case class SearchResult(id:String, api:String, title: String, details: String, highlights: String, url: String, img: String, tags:String, lat:Double = 0.0, lng: Double = 0.0) extends Model
   case class SearchResultList(category: String, next:String, num:Int, pages:Int, results:List[SearchResult]) extends Model
 
@@ -191,6 +191,9 @@ object Max {
 
   case class SyncOpenGraph(uId:Long, appId:String) extends Model
   case class GetCategories(uId:Long, appId:String) extends Model
+
+  case class GetCardInfo(id:String, api:String, lat:Double, lng:Double) extends Model
+  case class CardTab(tab:String, icon:String, content:String) extends Model
 }
 
 

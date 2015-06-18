@@ -1,5 +1,6 @@
 package io.surfkit.core.rabbitmq
 
+import akka.actor.SupervisorStrategy._
 import akka.util.ByteString
 import io.surfkit.model._
 import scala.concurrent.Future
@@ -50,7 +51,25 @@ object RabbitDispatcher {
 class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, Data] with ActorLogging {
   
   val reconnectIn = 10 seconds
-  
+
+  import akka.actor.OneForOneStrategy
+  import akka.actor.SupervisorStrategy._
+  import scala.concurrent.duration._
+
+  override val supervisorStrategy =
+    OneForOneStrategy(maxNrOfRetries = 10, withinTimeRange = 1 minute) {
+      case _: ActorInitializationException => Stop
+      case _: ActorKilledException         => Stop
+      case t: Exception                    =>
+        println(t)
+        println("RESTARTING..")
+        Restart
+      case _ =>
+        println("WTF!!!")
+        Stop
+    }
+
+
   val factory = {
     val cf = new ConnectionFactory()
     cf.setHost(address.host)

@@ -8,12 +8,13 @@ import play.api.libs.json.{JsArray, Format, Json}
 
 import scala.annotation.tailrec
 import scala.collection.JavaConversions._
-import akka.actor.{ActorLogging, Props}
+import akka.actor._
 import akka.util.ByteString
 
 import com.rabbitmq.client._
 
 import scala.concurrent.Future
+import scala.util.Try
 
 object RabbitModuleConsumer {
 
@@ -23,7 +24,6 @@ object RabbitModuleConsumer {
   def props(module:String, channel: Channel, mapper: (Api.Request) => Future[Api.Result]) =
     Props(new RabbitModuleConsumer(module, channel, mapper))
 }
-
 
 class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper: (Api.Request) => Future[Api.Result]) extends ActorPublisher[Api.Request] with ActorLogging {
   import akka.stream.actor.ActorPublisherMessage._
@@ -143,7 +143,9 @@ class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper:
 
   override def postStop() = {
     //this might be too late and could cause losing some messages
-    channel.basicCancel(consumer.getConsumerTag())
-    channel.close()
+    println("ACTOR SHUTDOWN POST STOP !!!! ")
+    //channel.basicCancel(consumer.getConsumerTag())
+    //channel.close()
+
   }
 }
