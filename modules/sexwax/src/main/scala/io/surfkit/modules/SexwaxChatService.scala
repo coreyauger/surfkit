@@ -53,7 +53,7 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
   }
 
 
-  def actions(r:Api.Request): PartialFunction[Model, Future[Api.Result]] = {
+  def actions(r:Api.Request): PartialFunction[Model, Future[Model]] = {
 
     /*
     case Chat.CreateGroup(name, permission, members) =>
@@ -68,14 +68,14 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
       }yield{
         val memberMap = chat.members.map(m => (m.jid, m)).toMap
         val chatWithEntries = Chat.Chat(chat.chatid,chat.members, entries.map(e => Chat.ChatEntry(e.chatid, e.chatentryid, e.timestamp, e.provider, e.json, memberMap.get(e.jid).getOrElse(Auth.ProfileInfo("","","Uknown","",e.jid,"")))))
-        Api.Result(0, r.module, r.op,  upickle.write[Chat.Chat](chatWithEntries), r.routing)
+        chatWithEntries
       }
 
     case Chat.GetChat(chatId) =>
       getMembersDetails(chatId) map {
         members =>
           val chat = Chat.Chat(chatId.chatId,members, Nil)
-          Api.Result(0, r.module, r.op,  upickle.write[Chat.Chat](chat), r.routing)
+          chat
       }
 
       /*
@@ -86,7 +86,7 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
     case Chat.MemberJoin(chatId, jid) =>
       connectMember(chatId, jid) map{
         join =>
-          Api.Result(0, r.module, r.op,  "", r.routing)
+          UnImplemented
       }
 
       /*
@@ -103,7 +103,7 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
       }yield{
         println(s"ChatCreate $cid, $chat")
         rooms += cid -> chat
-        Api.Result(0, r.module, r.op,  upickle.write(chat), r.routing)
+        chat
       }
 
 
@@ -119,8 +119,8 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
         // TODO: send an "invite" to all non-app members..
         // chat.members.filterNot(_.provider=="APPID").foreach(u => INVITE ACTION)
         // Send message to all members
-        chat.members.filter(_.provider=="APPID").foreach(u => rabbitUserDispatcher ! RabbitDispatcher.SendUser(u.id.toLong,"APPID",Api.Request("chat","send",upickle.write(chatEntry), Api.Route("","",0L))))
-        Api.Result(0, r.module, r.op,  upickle.write(entry), r.routing)
+        chat.members.filter(_.provider=="APPID").foreach(u => userDispatcher ! Api.SendUser(u.id.toLong,"APPID",Api.Request("chat","send",upickle.write(chatEntry), Api.Route("","",0L))))
+        entry
       }
 
 
@@ -149,15 +149,16 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
             val author = members.filter(_.jid == e.jid).headOption.getOrElse(Auth.UnknowProfile)
             Chat.Chat(e.chatid, members, Seq(Chat.ChatEntry.create(e,author))  )
         }
-        Api.Result(0, r.module, r.op,  upickle.write(chats), r.routing)
+        Chat.ChatList(chats)
       }
 
   }
 
 
+
   def mapper(r:Api.Request):Future[Api.Result] = {
     println("IN THE SEXWAX MAPPER ...")
-    r.op match {
+    (r.op match {
       //case "groups"        => actions(userId, sender)(GetUserGroups())
       case "groupcreate"   => actions(r)(upickle.read[Chat.CreateGroup](r.data.toString))
       case "history"       => actions(r)(upickle.read[Chat.GetHistory](r.data.toString))
@@ -169,34 +170,15 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
       case "create"        => actions(r)(upickle.read[Chat.ChatCreate](r.data.toString))
       case "setname"       => actions(r)(upickle.read[Chat.SetChatOrGroupName](r.data.toString))
       case _ =>
-        logger.error("Unknown operation.")
-        Future.successful(Api.Result(1, r.module, r.op, upickle.write(Api.Error("Unknown operation.")), r.routing))
-    }
+        logger.error(s"Unknown operation.  ${r.op}")
+        Future.failed(new Exception(s"Unknown operation.  ${r.op}"))
+    }).map(d => Api.Result(0, r.module, r.op,  upickle.write(d), r.routing))
   }
 
-  val module = "chat"
+  def module = "chat"
 
-  // Let's Wax !
-  val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
-  rabbitDispatcher ! RabbitDispatcher.ConnectModule(module, mapper)  // connect to the MQ
-
-  // TODO: don't like the multiple dispatcher bit :(
-  val rabbitUserDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
-  rabbitUserDispatcher ! RabbitDispatcher.Connect  // connect to the MQ
 
 }
 
 
 
-
-
-// Helper Config
-object Configuration {
-  import com.typesafe.config.ConfigFactory
-
-  private val config = ConfigFactory.load
-  config.checkValid(ConfigFactory.defaultReference)
-
-  lazy val hostRabbit = config.getString("rabbitmq.host")
-  lazy val portRabbit = config.getInt("rabbitmq.port")
-}

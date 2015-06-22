@@ -102,6 +102,7 @@ class SurfKitUserService extends UserService[User] {
     }
     WS.url(s"$surfkitEndpoint/auth/find").post( upickle.write(io.surfkit.model.Auth.FindUser("APPID",providerId,userId)) ).map{
       res =>
+        println(s"ret json: ${res.json}")
         val apiRes = upickle.read[Api.Result](res.json.toString)
         ProfileImplicits.ProviderProfile2BasicProfile(Try(upickle.read[ProviderProfile](apiRes.data)).toOption)
     }

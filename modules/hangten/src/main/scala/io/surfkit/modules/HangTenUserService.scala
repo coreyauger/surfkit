@@ -21,35 +21,20 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
   val db = HangTenSlick.db
 
 
-  def actions(r:Api.Request): PartialFunction[Model, Future[Api.Result]] = {
+  def actions(r:Api.Request): PartialFunction[Model, Future[Model]] = {
     case Auth.FindUser(appId:String, providerId: String, userId: String) =>
       logger.debug(s"Auth.FindUser($appId, $providerId, $userId)")
       HangTenSlick.getProvider(appId, providerId, userId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
-          Api.Result(0,
-            r.module,
-            r.op,
-            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)),r.routing)
-      }.recover {
-        case _ =>
-          Api.Result(1, r.module, r.op, "",r.routing)
+            HangTenSlick.Implicits.FlatProviderToProvider(provider.head)
       }
-
-
 
     case Auth.GetProvider(uId:Long, appId:String, providerId: String) =>
       logger.debug(s"Auth.GetProvider($uId, $appId, $providerId)")
       HangTenSlick.getProviderForUser(uId, appId, providerId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
-          Api.Result(0,
-            r.module,
-            r.op,
-            upickle.write(HangTenSlick.Implicits.FlatProviderToProvider(provider.head)),r.routing)
-      }.recover {
-        case _ =>
-          Api.Result(1, r.module, r.op, "",r.routing)
+            HangTenSlick.Implicits.FlatProviderToProvider(provider.head)
       }
-
 
     case p:Auth.ProviderProfile =>
       // this is a save or an update operation...
@@ -59,7 +44,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           // TODO: write an update
           val h = pro.head
           addFriendsToGraph(p.appId, h.userKey, p)
-          Future.successful( Api.Result(0,r.module, r.op, upickle.write(Auth.SaveResponse(pro.head.id)), r.routing))
+          Future.successful(Auth.SaveResponse(pro.head.id))
       }.recoverWith {
         case _ =>
           println("could not find.. running save..")
@@ -70,38 +55,36 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
                   // try to import friends for this provider
                   addFriendsToGraph(p.appId, id, p)
               }
-              Api.Result(0, r.module, r.op, upickle.write(Auth.SaveResponse(id)), r.routing )
+              Auth.SaveResponse(id)
           }.recover {
             case _ =>
-              Api.Result(1, r.module, r.op, upickle.write(Auth.SaveResponse(0L)),r.routing)
+              Auth.SaveResponse(0L)
           }
       }
 
     case g:Auth.GetFriends => {
       println("IN Auth.GetFriends")
-      getUserFriends(g.userId).map {
-        jsArr =>
-          Api.Result(0, r.module, r.op, upickle.write[Seq[Auth.ProfileInfo]](jsArr), r.routing)
-      }
+      getUserFriends(g.userId).map(Auth.ProfileInfoList(_))
     }
 
     case g:Auth.CreateActor =>
+      println("$$$")
+      println("$$$")
       println("CreateActor")
-      users = system.actorOf(UserActor.props(g.userId,r.routing,rabbitUserDispatcher)) :: users
-      Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
+      users = system.actorOf(UserActor.props(g.userId, r.routing, userDispatcher)) :: users
+      Future.successful(Ack)
 
     case e:Auth.Echo =>
       e.users.foreach( user =>
-        //println(s"Sending to user $user")
-        rabbitUserDispatcher ! RabbitDispatcher.SendUser(user,"APPID",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
+        userDispatcher ! Api.SendUser(user,"APPID",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
       )
-      Future.successful(Api.Result(0, r.module, r.op, "",r.routing))
+      Future.successful(Ack)
   }
 
 
   def mapper(r:Api.Request):Future[Api.Result] = {
     println("IN THE MAPPER ...")
-    r.op match {
+    (r.op match {
       case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
       case "provider" => actions(r)(upickle.read[Auth.GetProvider](r.data.toString))
       case "save" => actions(r)(upickle.read[Auth.ProviderProfile](r.data.toString))
@@ -109,32 +92,12 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
       case "actor" => actions(r)(upickle.read[Auth.CreateActor](r.data.toString))
       case "echo" => actions(r)(upickle.read[Auth.Echo](r.data.toString))
       case _ =>
-        logger.error("Unknown operation.")
-        Future.successful(Api.Result(1, r.module, r.op, upickle.write(Api.Error("Unknown operation.")), r.routing))
-    }
+        logger.error(s"Unknown operation.  ${r.op}")
+        Future.failed(new Exception(s"Unknown operation.  ${r.op}"))
+    }).map(d => Api.Result(0, r.module, r.op,  upickle.write(d), r.routing))
   }
-  val module = "auth"
-  // Let's HangTen !
-  val rabbitDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
-  rabbitDispatcher ! RabbitDispatcher.ConnectModule(module, mapper)  // connect to the MQ
+  def module = "auth"
 
-  // TODO: don't like the multiple dispatcher bit :(
-  val rabbitUserDispatcher = system.actorOf(RabbitDispatcher.props(RabbitMqAddress(Configuration.hostRabbit, Configuration.portRabbit)))
-  rabbitUserDispatcher ! RabbitDispatcher.Connect  // connect to the MQ
 
 }
 
-
-
-
-
-// Helper Config
-object Configuration {
-  import com.typesafe.config.ConfigFactory
-
-  private val config = ConfigFactory.load
-  config.checkValid(ConfigFactory.defaultReference)
-
-  lazy val hostRabbit = config.getString("rabbitmq.host")
-  lazy val portRabbit = config.getInt("rabbitmq.port")
-}

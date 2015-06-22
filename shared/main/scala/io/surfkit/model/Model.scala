@@ -3,7 +3,8 @@ package io.surfkit.model
 import io.surfkit.model.Auth.{ProfileInfo, UserID}
 
 sealed trait Model
-
+case object UnImplemented extends Model
+case object Ack extends Model
 
 // Model for HangTen (Auth) Module
 object Auth{
@@ -88,6 +89,7 @@ object Auth{
     def avatarUrl: String
   }
   case class ProfileInfo(provider: String, id: String, fullName: String, email: String, jid: String, avatarUrl: String) extends BaseProfile
+  case class ProfileInfoList(list:Seq[ProfileInfo]) extends Model
 
   def UnknowProfile =
     ProfileInfo("","","Unknown","","","/assets/images/avatar.png")
@@ -119,6 +121,8 @@ object Chat {
                             msg: String) extends ChatMsg
   case class ChatCreate(userId:UserID,members: Set[String]) extends ChatMsg
   case class SetChatOrGroupName(chatId: ChatID, name: String) extends ChatMsg
+
+  case class ChatList(list:Seq[Chat]) extends ChatMsg
 
 
   //
@@ -176,6 +180,12 @@ object Api {
   case class Result(status: Int, module: String, op: String, data: String, routing: Route) extends Model
 
   case class Error(msg:String) extends Model
+
+
+  // Send Data Wrappers....
+  sealed trait ApiMessage extends Model
+  case class SendUser(receiverUid: Long, appId: String, req: io.surfkit.model.Api.Request) extends ApiMessage
+  case class SendSys(module:String, appId: String, corrId:String, req: io.surfkit.model.Api.Request ) extends  ApiMessage
 }
 
 

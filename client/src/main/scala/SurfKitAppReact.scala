@@ -87,11 +87,11 @@ object SurfKitAppReact extends JSApp{
     }
 
     socket.getFriends.map(friends =>
-      $.modState(s => s.copy(friendState = FriendsState(friends,"",FriendEvents(onFilterChange,onFriendSelect, null))))
+      $.modState(s => s.copy(friendState = FriendsState(friends.list,"",FriendEvents(onFilterChange,onFriendSelect, null))))
     ).onFailure(reportFailure)
 
     socket.getRecentChatList.map(history =>
-      $.modState(c => c.copy(recentChats = history))
+      $.modState(c => c.copy(recentChats = history.list.toList))
     ).onFailure(reportFailure)
 
 

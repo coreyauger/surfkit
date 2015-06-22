@@ -27,12 +27,12 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
           post{
             implicit ctx =>
               println("********************************")
-              v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath, Json.parse(ctx.request.entity.asString))
+              v1 ! ServiceActor.SendMessage(ctx.responder, ctx.unmatchedPath, Json.parse(ctx.request.entity.asString))
           } ~
             get{
               implicit ctx =>
                 println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$4")
-                v1 ! RabbitMqActor.Mq(ctx.responder, ctx.unmatchedPath,Json.obj())
+                v1 ! ServiceActor.SendMessage(ctx.responder, ctx.unmatchedPath,Json.obj())
             }
         } ~
         getFromResourceDirectory(dir)

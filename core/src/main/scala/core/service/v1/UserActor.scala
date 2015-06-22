@@ -10,8 +10,6 @@ import io.surfkit.model.{Chat, Api, Auth}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.rabbitmq.client.Connection
-import io.surfkit.core.Configuration
-import io.surfkit.core.rabbitmq.RabbitDispatcher.RabbitMqAddress
 import io.surfkit.core.rabbitmq.{RabbitDispatcher, RabbitUserConsumer}
 
 import scala.util.{Failure, Success}
@@ -51,7 +49,7 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
       val a = Auth.AbsorbActorReq(channelId)
       val req = Api.Request("auth","register", upickle.write(a), Api.Route("","",0L) )
       println("Sending Absorb to RabbitDispatcher...")
-      rabbitDispatcher ! RabbitDispatcher.SendUser(uid,"appId",req)
+      rabbitDispatcher ! Api.SendUser(uid,"appId",req)
     case Failure(_) =>
       log.info("Failed to get a connection from RabbitDispatcher. Will try again in 5 seconds.")
       context.system.scheduler.scheduleOnce(5.second) {
@@ -208,7 +206,7 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
         val a = Auth.AbsorbActorRes(channels)
         val req = Api.Request("auth","channels", upickle.write(a), Api.Route("","",0L) )
         println("Sending AbsorbActorRes RabbitDispatcher...")
-        rabbitDispatcher ! RabbitDispatcher.SendUser(uid,"appId",req)
+        rabbitDispatcher ! Api.SendUser(uid,"appId",req)
         // now we can shut down.. since there should only be one user actor.
         context.stop(self)
       }else {

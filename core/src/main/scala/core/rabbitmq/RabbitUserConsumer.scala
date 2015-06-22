@@ -53,7 +53,8 @@ class RabbitUserConsumer(userId: Long, userActor: ActorRef)(implicit connection:
       
   override def receive = {
     case msg: RabbitUserConsumer.RabbitMessage =>
-      log.debug(s"received msg with deliveryTag ${msg.deliveryTag}")
+      println("USER ::  @@@@@@@@@@@@@@@@@@")
+      log.debug(s"RabbitUserConsumer received msg with deliveryTag ${msg.deliveryTag}")
       userActor ! msg
 
       // This pushes data back into rabbit that will go down the web socket connections to the user.

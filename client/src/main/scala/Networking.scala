@@ -101,21 +101,21 @@ class Networking(val uid:Long)(implicit val applicationID:String) {
     else this.sendQueue = op :: this.sendQueue
   }
 
-  def getFriends():Future[Seq[Auth.ProfileInfo]] = {
-    val p = Promise[Seq[Auth.ProfileInfo]]()
+  def getFriends():Future[Auth.ProfileInfoList] = {
+    val p = Promise[Auth.ProfileInfoList]()
     addFuture("auth","friends"){
       data:String =>
-        p.complete(Try(upickle.read[Seq[Auth.ProfileInfo]](data)))
+        p.complete(Try(upickle.read[Auth.ProfileInfoList](data)))
     }
     send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends("APPID",uid)))
     p.future
   }
 
-  def getRecentChatList():Future[List[io.surfkit.model.Chat.Chat]] ={
-    val p = Promise[List[io.surfkit.model.Chat.Chat]]()
+  def getRecentChatList():Future[io.surfkit.model.Chat.ChatList] ={
+    val p = Promise[io.surfkit.model.Chat.ChatList]()
     addFuture("chat","list"){
       data:String =>
-        p.complete(Try(upickle.read[List[io.surfkit.model.Chat.Chat]](data)))
+        p.complete(Try(upickle.read[io.surfkit.model.Chat.ChatList](data)))
     }
     send(io.surfkit.model.Socket.Op("chat","list",io.surfkit.model.Chat.GetRecentChatList(uid, "")))
     p.future

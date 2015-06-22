@@ -33,10 +33,6 @@ object RabbitDispatcher {
 
   case class RabbitMqAddress(host:String, port:Int)
 
-  sealed trait RabbitSend
-  case class SendUser(receiverUid: Long, appId: String, req: io.surfkit.model.Api.Request) extends RabbitSend
-  case class SendSys(module:String, appId: String, corrId:String, req: io.surfkit.model.Api.Request ) extends  RabbitSend
-
   sealed trait State
   case object Connected extends State
   case object Disconnected extends State
@@ -78,7 +74,7 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
     cf
   }
   
-  var msgBuffer: Queue[RabbitSend] = Queue.empty
+  var msgBuffer: Queue[Api.ApiMessage] = Queue.empty
   
   val shutdownListener = new ShutdownListener {
     override def shutdownCompleted(cause: ShutdownSignalException) {
@@ -98,7 +94,7 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
           val channel = conn.createChannel()
           val replyQueueName = channel.queueDeclare().getQueue()
           val publisher = context.actorOf(RabbitPublisher.props(channel, replyQueueName))
-          val consumer = context.actorOf(RabbitSysConsumer.props(channel, replyQueueName))
+          context.actorOf(RabbitSysConsumer.props(channel, replyQueueName))
           goto(Connected) using BrokerConnection(conn, publisher)
         case Failure(f) =>
           log.error(f, s"Couldn't connect to RabbitMQ server at $address")
@@ -120,19 +116,19 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
           setTimer("RabbitMQ reconnection", RabbitDispatcher.Connect, reconnectIn, false)
           stay
       }
-    case Event(msg: RabbitSend, _) =>
+    case Event(msg: Api.ApiMessage, _) =>
       msgBuffer = msgBuffer.enqueue(msg)
       stay
   }
   
   when(Connected) {
-    case Event(SendUser(uid, appId, req), BrokerConnection(_, publisher)) =>
+    case Event(Api.SendUser(uid, appId, req), BrokerConnection(_, publisher)) =>
       println("RabbitDispatcher Send USER.. about to publish message...")
       println(s"publisher: $publisher")
       println(s"publisher: $uid, $appId, $req")
       publisher ! RabbitPublisher.RabbitUserMessage(uid, appId, req)
       stay
-    case Event(SendSys(module, appId, corrId, msg), BrokerConnection(_, publisher)) =>
+    case Event(Api.SendSys(module, appId, corrId, msg), BrokerConnection(_, publisher)) =>
       publisher ! RabbitPublisher.RabbitSystemMessage(module, appId, corrId, msg)
       stay
     case Event(GetConnection, BrokerConnection(conn, _)) =>
@@ -156,12 +152,12 @@ class RabbitDispatcher(address: RabbitMqAddress) extends Actor with FSM[State, D
   }
   
   @tailrec
-  private[this] def send(buffer: Queue[RabbitSend], publisher: ActorRef): Queue[RabbitSend] =
+  private[this] def send(buffer: Queue[Api.ApiMessage], publisher: ActorRef): Queue[Api.ApiMessage] =
     buffer.dequeueOption match {
-      case Some((SendUser(uuid, provider, msg), buff)) =>
+      case Some((Api.SendUser(uuid, provider, msg), buff)) =>
         publisher ! RabbitPublisher.RabbitUserMessage(uuid, provider, msg)
         send(buff, publisher)
-      case Some((SendSys(module, appId, corrId:String, msg), buff)) =>
+      case Some((Api.SendSys(module, appId, corrId:String, msg), buff)) =>
         publisher ! RabbitPublisher.RabbitSystemMessage(module, appId, corrId, msg)
         send(buff, publisher)
       case None => buffer
