@@ -33,7 +33,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
       logger.debug(s"Auth.GetProvider($uId, $appId, $providerId)")
       HangTenSlick.getProviderForUser(uId, appId, providerId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
-            HangTenSlick.Implicits.FlatProviderToProvider(provider.head)
+          provider.headOption.map(HangTenSlick.Implicits.FlatProviderToProvider).getOrElse(Ack)
       }
 
     case p:Auth.ProviderProfile =>
