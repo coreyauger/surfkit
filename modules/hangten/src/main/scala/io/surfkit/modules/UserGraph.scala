@@ -150,7 +150,7 @@ trait UserGraph extends NeoService {
           val profile = s"u${uid}-${user.appId}-default"
           val name = user.firstName.getOrElse("") + " " + user.lastName.getOrElse("")
           val avatarUrl = user.avatarUrl.getOrElse("")
-          val params = uParams ++ Json.obj("appId" -> user.appId, "profile" -> profile, "waJid" -> waJid, "jid" -> jid, "uid" -> uid)
+          val params = uParams ++ Json.obj("appId" -> user.appId, "profile" -> profile, "waJid" -> waJid, "jid" -> jid, "uid" -> uid, "token" -> token)
           // fire and forget...
           Q( """
                 |MERGE (p:Provider {jid:{jid}})
@@ -252,7 +252,7 @@ trait UserGraph extends NeoService {
                             |  authMethod: "",
                             |  oAuth1InfoToken: "",
                             |  oAuth1InfoSecret: "",
-                            |  oAuth2InfoAccessToken: "",
+                            |  oAuth2InfoAccessToken: {token},
                             |  oAuth2InfoExpiresIn: 0,
                             |  oAuth2InfoRefreshToken: "",
                             |  oAuth2InfoTokenType: "",
