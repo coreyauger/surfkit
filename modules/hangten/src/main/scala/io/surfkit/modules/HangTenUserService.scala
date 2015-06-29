@@ -44,7 +44,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           // TODO: write an update
           val h = pro.head
           addFriendsToGraph(p.appId, h.userKey, p)
-          Future.successful(Auth.SaveResponse(pro.head.id))
+          Future.successful(Auth.SaveResponse(pro.head.userKey))
       }.recoverWith {
         case _ =>
           println("could not find.. running save..")
