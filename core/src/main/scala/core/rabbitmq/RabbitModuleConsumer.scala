@@ -2,7 +2,7 @@ package io.surfkit.core.rabbitmq
 
 import akka.stream.actor.ActorPublisher
 import akka.stream.scaladsl.{Source, Sink, Flow}
-import akka.stream.ActorFlowMaterializer
+import akka.stream.{ActorFlowMaterializerSettings, Supervision, ActorFlowMaterializer}
 import io.surfkit.model._
 import play.api.libs.json.{JsArray, Format, Json}
 
@@ -29,7 +29,6 @@ class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper:
   import akka.stream.actor.ActorPublisherMessage._
   import io.surfkit.core.rabbitmq.RabbitModuleConsumer._
 
-  implicit val materializer = ActorFlowMaterializer()
 
   val MaxBufferSize = 100
   var buf = Vector.empty[Api.Request]
@@ -44,6 +43,23 @@ class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper:
     channel.queueBind(queue, sysExchange, queue)
     channel.basicQos(1)
   }
+
+
+  val decider: Supervision.Decider = {
+    case t:Throwable  =>
+      println("ERROR: ... resuming stream")
+      log.error(t, "ERROR in akka stream")
+      Supervision.Resume
+    case ex =>
+      println("ERROR: ... resuming stream")
+      Supervision.Resume
+  }
+
+  implicit val materializer = ActorFlowMaterializer(
+    ActorFlowMaterializerSettings(context.system).withSupervisionStrategy(decider)
+  )
+
+
 
   val source = Source[Api.Request](Props[RabbitModuleConsumer](this))
   source
