@@ -192,10 +192,10 @@ object Api {
 
 
 object Max {
-  case class SearchNext(api:String, next:String)extends Model
+  case class SearchNext(api:String, name:String, value:String)extends Model
   case class Search(category:String, query:String, members:Set[Long], lat:Double, lng:Double, next: Option[List[SearchNext]] = None) extends Model
   case class SearchResult(id:String, api:String, title: String, details: String, highlights: String, url: String, img: String, tags:String, lat:Double = 0.0, lng: Double = 0.0) extends Model
-  case class SearchResultList(category: String, next:String, num:Int, pages:Int, results:List[SearchResult]) extends Model
+  case class SearchResultList(category: String, next:List[SearchNext], num:Int, pages:Int, results:List[SearchResult]) extends Model
 
   case class SearchCategory(title:String, category:String, icon:String ) extends Model
 
@@ -204,6 +204,8 @@ object Max {
 
   case class GetCardInfo(id:String, api:String, lat:Double, lng:Double) extends Model
   case class CardTab(tab:String, icon:String, content:String) extends Model
+
+  case class Log(id:Long, userKey:Long, date:String, json:String) extends Model
 }
 
 
