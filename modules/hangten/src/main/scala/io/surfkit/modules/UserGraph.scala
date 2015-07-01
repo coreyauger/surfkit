@@ -99,6 +99,11 @@ trait UserGraph extends NeoService {
         WHERE u.uid = {uid} AND pu.name = {provider}
         FOREACH (p in {props} |
           MERGE (f:Provider {name: p.name, jid: p.jid, id: p.id})
+          ON CREATE
+            SET
+              f.fullName = p.fullName,
+              f.avatarUrl = p.avatarUrl,
+              f.email = ''
           CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
         RETURN u
       """).use("uid" -> uid, "provider" -> provider, "props" -> friends).run()
