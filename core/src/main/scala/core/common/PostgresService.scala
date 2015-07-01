@@ -5,6 +5,7 @@ import java.util.{Date, TimeZone}
 import com.github.mauricio.async.db._
 import com.github.mauricio.async.db.postgresql.util.URLParser
 import com.github.mauricio.async.db.postgresql.pool.PostgreSQLConnectionFactory
+import com.typesafe.config.ConfigFactory
 
 import play.api.libs.concurrent.Execution.Implicits._
 import play.api.libs.json._
@@ -19,7 +20,10 @@ trait PostgresService {
 
   def strToDate(s:String) = dateFormatUtc.parse(s)
 
-  private val configuration = URLParser.parse("jdbc:postgresql://localhost:5432/sktest?user=postgres&password=Neverdull42")
+  val dbConfig = ConfigFactory.load()
+  val connectionString = s"${dbConfig.getString("database.jdbc.connection")}?user=${dbConfig.getString("database.jdbc.user")}&password=${dbConfig.getString("database.jdbc.pass")}"
+  println(connectionString)
+  private val configuration = URLParser.parse(connectionString)
   private val factory = new PostgreSQLConnectionFactory( configuration )
 
   @implicitNotFound(

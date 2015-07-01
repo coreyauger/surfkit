@@ -47,9 +47,9 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
       // CA - we now "absorb" any other user actors of the same id taking over their channels..
       // TODO: app id ??
       val a = Auth.AbsorbActorReq(channelId)
-      val req = Api.Request("auth","register", upickle.write(a), Api.Route("","",0L) )
+      val req = Api.Request("APPID?", "auth","register", upickle.write(a), Api.Route("","",0L) )
       println("Sending Absorb to RabbitDispatcher...")
-      rabbitDispatcher ! Api.SendUser(uid,"appId",req)
+      rabbitDispatcher ! Api.SendUser(uid,"APPID?",req)
     case Failure(_) =>
       log.info("Failed to get a connection from RabbitDispatcher. Will try again in 5 seconds.")
       context.system.scheduler.scheduleOnce(5.second) {
@@ -204,9 +204,9 @@ class UserActor(uid: Long, channelId:Api.Route, rabbitDispatcher: ActorRef) exte
       if( r.channelId != channelId ){
         // we need to be absorbed ...
         val a = Auth.AbsorbActorRes(channels)
-        val req = Api.Request("auth","channels", upickle.write(a), Api.Route("","",0L) )
+        val req = Api.Request("APPID?", "auth","channels", upickle.write(a), Api.Route("","",0L) )
         println("Sending AbsorbActorRes RabbitDispatcher...")
-        rabbitDispatcher ! Api.SendUser(uid,"appId",req)
+        rabbitDispatcher ! Api.SendUser(uid,"APPID?",req)
         // now we can shut down.. since there should only be one user actor.
         context.stop(self)
       }else {

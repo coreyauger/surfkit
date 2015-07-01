@@ -100,7 +100,7 @@ class RabbitModuleConsumer(val module: String, val channel: Channel, val mapper:
       val apiReq = upickle.read[Api.Request](payload)
       println(s"apiReq: $apiReq")
 
-      self ! Api.Request( apiReq.module, apiReq.op, apiReq.data, Api.Route(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag) )
+      self ! Api.Request(apiReq.appId, apiReq.module, apiReq.op, apiReq.data, Api.Route(properties.getCorrelationId, properties.getReplyTo(), envelope.getDeliveryTag) )
       //self ! RabbitMessage(envelope.getDeliveryTag, properties.getReplyTo(), properties.getCorrelationId, headers, ByteString(body))
 
       // when we know this data is for this modules...

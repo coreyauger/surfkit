@@ -107,7 +107,7 @@ class Networking(val uid:Long)(implicit val applicationID:String) {
       data:String =>
         p.complete(Try(upickle.read[Auth.ProfileInfoList](data)))
     }
-    send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends("APPID",uid)))
+    send(io.surfkit.model.Socket.Op("auth","friends",Auth.GetFriends(uid)))
     p.future
   }
 

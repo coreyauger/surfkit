@@ -27,12 +27,14 @@ class SurfKitService(v1 : ActorRef)(implicit system : ActorSystem) extends Direc
           post{
             implicit ctx =>
               println("********************************")
-              v1 ! ServiceActor.SendMessage(ctx.responder, ctx.unmatchedPath, Json.parse(ctx.request.entity.asString))
+              val appId = "maxsearch"     // TODO: make this variable
+              v1 ! ServiceActor.SendMessage(appId, ctx.responder, ctx.unmatchedPath, Json.parse(ctx.request.entity.asString))
           } ~
             get{
               implicit ctx =>
                 println("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$4")
-                v1 ! ServiceActor.SendMessage(ctx.responder, ctx.unmatchedPath,Json.obj())
+                val appId = "maxsearch"     // TODO: make this variable
+                v1 ! ServiceActor.SendMessage(appId, ctx.responder, ctx.unmatchedPath,Json.obj())
             }
         } ~
         getFromResourceDirectory(dir)

@@ -22,23 +22,23 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
 
 
   def actions(r:Api.Request): PartialFunction[Model, Future[Model]] = {
-    case Auth.FindUser(appId:String, providerId: String, userId: String) =>
-      logger.debug(s"Auth.FindUser($appId, $providerId, $userId)")
-      HangTenSlick.getProvider(appId, providerId, userId).map {
+    case Auth.FindUser(providerId: String, userId: String) =>
+      logger.debug(s"Auth.FindUser(${r.appId}, $providerId, $userId)")
+      HangTenSlick.getProvider(r.appId, providerId, userId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
             HangTenSlick.Implicits.FlatProviderToProvider(provider.head)
       }
 
-    case Auth.GetProvider(uId:Long, appId:String, providerId: String) =>
-      logger.debug(s"Auth.GetProvider($uId, $appId, $providerId)")
-      HangTenSlick.getProviderForUser(uId, appId, providerId).map {
+    case Auth.GetProvider(uId:Long, providerId: String) =>
+      logger.debug(s"Auth.GetProvider($uId, ${r.appId}, $providerId)")
+      HangTenSlick.getProviderForUser(uId, r.appId, providerId).map {
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
           provider.headOption.map(HangTenSlick.Implicits.FlatProviderToProvider).getOrElse(Ack)
       }
 
     case p:Auth.ProviderProfile =>
       // this is a save or an update operation...
-      HangTenSlick.getProvider(p.appId, p.providerId, p.userId).flatMap{
+      HangTenSlick.getProvider(r.appId, p.providerId, p.userId).flatMap{
         case pro:Seq[HangTenSlick.FlatProviderProfile] =>
           println(s"LENGTH: ${pro.length}")
           // TODO: write an update
@@ -76,7 +76,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
 
     case e:Auth.Echo =>
       e.users.foreach( user =>
-        userDispatcher ! Api.SendUser(user,"APPID",Api.Request("auth","echo",upickle.write(e), Api.Route("","",0L)))
+        userDispatcher ! Api.SendUser(user,r.appId,Api.Request(r.appId, "auth","echo",upickle.write(e), Api.Route("","",0L)))
       )
       Future.successful(Ack)
   }

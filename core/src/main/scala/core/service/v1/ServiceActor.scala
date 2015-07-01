@@ -17,7 +17,7 @@ object ServiceActor {
   sealed trait Message
   case object Clear extends Message
   case class Unregister(ws : WebSocket) extends Message
-  case class SendMessage(responder: ActorRef, path : Uri.Path, data : JsValue) extends Message
+  case class SendMessage(appId: String, responder: ActorRef, path : Uri.Path, data : JsValue) extends Message
 }
 
 class ServiceActor(actorProps:Props) extends Actor with ActorLogging {
@@ -33,22 +33,22 @@ class ServiceActor(actorProps:Props) extends Actor with ActorLogging {
 
   // bi-key maps...
   val wsResponders = mutable.Map[String, WebSocket]()
-  val wsMap =  mutable.Map[WebSocket, String]()
+  val wsMap =  mutable.Map[WebSocket, (String,String)]()
 
   override def receive = {
-    case WebSocket.Open(uid, ws) =>
+    case WebSocket.Open(appId, uid, ws) =>
       println("WS OPEN ....")
       if (null != ws) {
         //clients += ws
         val corrId = UUID.randomUUID().toString
         wsResponders += corrId -> ws
-        wsMap += ws -> corrId
+        wsMap += ws -> (corrId,appId)
         log.debug("registered monitor for url {}", ws.path)
         // CA - we send the connection to Auth to create or add to UserActor.
         val route = Api.Route(corrId,"",0L)
-        val newActor = Auth.CreateActor("appID",uid)
-        val req = Api.Request("auth", "actor", upickle.write(newActor), route)
-        dispatcher ! Api.SendSys(req.module,"appID", corrId, req)
+        val newActor = Auth.CreateActor(uid)
+        val req = Api.Request(appId, "auth", "actor", upickle.write(newActor), route)
+        dispatcher ! Api.SendSys(req.module,appId, corrId, req)
       }
     case WebSocket.Close(ws, code, reason) =>
       self ! ServiceActor.Unregister(ws)
@@ -60,9 +60,9 @@ class ServiceActor(actorProps:Props) extends Actor with ActorLogging {
         // get the corrId for this socket..
         val wsOp = upickle.read[Socket.Op](msg)
         wsMap.get(ws) match{
-          case Some(corrId) =>
-            val req = Api.Request(wsOp.module, wsOp.op, upickle.write(wsOp.data), Api.Route(corrId,"",0L) )
-            dispatcher ! Api.SendSys(req.module, "appID", corrId, req)
+          case Some( (corrId, appId) ) =>
+            val req = Api.Request(appId, wsOp.module, wsOp.op, upickle.write(wsOp.data), Api.Route(corrId,"",0L) )
+            dispatcher ! Api.SendSys(req.module, appId, corrId, req)
           case None =>
             log.error("[ERROR] There is no corrId for this websocket")
         }
@@ -71,12 +71,12 @@ class ServiceActor(actorProps:Props) extends Actor with ActorLogging {
     case ServiceActor.Unregister(ws) =>
       if (null != ws) {
         //clients -= ws
-        wsResponders -= wsMap(ws)
+        wsResponders -= wsMap(ws)._1
         wsMap -= ws
         log.debug("unregister monitor")
         // TODO: unregister from UserActor..
       }
-    case mq @ ServiceActor.SendMessage(responder, path, data) =>
+    case mq @ ServiceActor.SendMessage(appId, responder, path, data) =>
       log.debug("Mq {} '{}'", mq.path, mq.data)
       //for (client <- clients) client.send(msg)
       //log.debug("sent to {} clients to clear marker '{}'", clients.size, msg)
@@ -85,8 +85,8 @@ class ServiceActor(actorProps:Props) extends Actor with ActorLogging {
       val slotOp = path.tail.toString.split('/').toList
       slotOp match{
         case module :: op :: Nil =>
-          val req = Api.Request(module, op, mq.data.toString, Api.Route(corrId,"",0L))
-          dispatcher ! Api.SendSys(req.module, "appID", corrId, req)
+          val req = Api.Request(appId, module, op, mq.data.toString, Api.Route(corrId,"",0L))
+          dispatcher ! Api.SendSys(req.module, appId, corrId, req)
         case _ =>
           log.error(s"Invalid API request with path: $path")
       }

@@ -3,6 +3,7 @@ package io.surfkit.modules
 import java.util.{Date, UUID}
 
 import akka.util.Timeout
+import com.typesafe.config.ConfigFactory
 import core.common.NeoService
 import play.api.libs.json.{JsValue, JsObject, JsArray, Json}
 import scala.concurrent.duration._
@@ -17,7 +18,10 @@ import scala.util.{Failure, Success}
 
 trait UserGraph extends NeoService {
 
-  implicit def neo4jserver = new Neo4JServer("127.0.0.1", 7474, "/db/data/")
+  val appConfig = ConfigFactory.load()
+
+
+  implicit def neo4jserver = new Neo4JServer(appConfig.getString("database.neo4j.host"), appConfig.getInt("database.neo4j.port"), appConfig.getString("database.neo4j.path"))
   //We provide xxxQ for the rest of the world so they can make transactions just by apppending Qs
 
   def createNeo4JConstrains() = {

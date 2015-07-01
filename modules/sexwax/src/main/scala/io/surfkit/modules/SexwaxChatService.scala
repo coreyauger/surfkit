@@ -96,7 +96,7 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
 
     case Chat.ChatCreate(userId, members) =>
       println("ChatCreate")
-      val jid = s"$userId@APPID"
+      val jid = s"$userId@${r.appId}"
       for{
         cid <- createOrGetChatId(userId,jid, (members+jid))
         chat <- getChat(cid)
@@ -119,7 +119,9 @@ object SexwaxChatService extends App with SurfKitModule with ChatGraph with Chat
         // TODO: send an "invite" to all non-app members..
         // chat.members.filterNot(_.provider=="APPID").foreach(u => INVITE ACTION)
         // Send message to all members
-        chat.members.filter(_.provider=="APPID").foreach(u => userDispatcher ! Api.SendUser(u.id.toLong,"APPID",Api.Request("chat","send",upickle.write(chatEntry), Api.Route("","",0L))))
+        //chat.members.filter(_.provider==r.appId).foreach(u => userDispatcher ! Api.SendUser(u.id.toLong,r.appId,Api.Request(r.appId, "chat","send",upickle.write(chatEntry), Api.Route("","",0L))))
+        // TODO: filter by app id
+        chat.members.foreach(u => userDispatcher ! Api.SendUser(u.id.toLong,r.appId,Api.Request(r.appId, "chat","send",upickle.write(chatEntry), Api.Route("","",0L))))
         entry
       }
 

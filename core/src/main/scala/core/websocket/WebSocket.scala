@@ -6,7 +6,7 @@ import spray.http.HttpRequest
 
 object WebSocket {
   sealed trait WebSocketMessage
-  case class Open(uid:Long, ws : WebSocket) extends WebSocketMessage
+  case class Open(appId:String, uid:Long, ws : WebSocket) extends WebSocketMessage
   case class Message(ws : WebSocket, msg : String) extends WebSocketMessage
   case class Close(ws : WebSocket, code : Int, reason : String) extends WebSocketMessage
   case class Error(ws : WebSocket, reason : String) extends WebSocketMessage

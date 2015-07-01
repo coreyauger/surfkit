@@ -59,14 +59,14 @@ object Auth{
                               passwordInfo: Option[PasswordInfo] = None) extends GenericProfile
 
 
-  case class CreateActor(appId: String, userId:Long ) extends Model
+  case class CreateActor(userId:Long ) extends Model
   case class AbsorbActorReq(channelId:Api.Route)extends Model
   case class AbsorbActorRes(channels:List[Api.Route])extends Model
   case class Echo(msg:String, users:List[Long]) extends  Model
 
-  case class FindUser(appId: String, providerId:String, userId:String) extends Model
-  case class GetProvider(uId:Long, appId:String, provider:String)  extends Model
-  case class GetFriends(appId: String, userId:Long ) extends Model
+  case class FindUser(providerId:String, userId:String) extends Model
+  case class GetProvider(uId:Long, provider:String)  extends Model
+  case class GetFriends(userId:Long ) extends Model
   case class SaveResponse(userId: Long) extends Model
   case class OAuth1Info(token: String, secret: String) extends Model
   case class OAuth2Info(accessToken: String, tokenType: Option[String] = None, expiresIn: Option[Int] = None, refreshToken: Option[String] = None) extends  Model
@@ -175,7 +175,7 @@ object Socket{
 
 object Api {
   case class Route(id: String, reply: String, tag: Long) extends Model
-  case class Request(module: String, op: String, data: String, routing: Route)extends Model
+  case class Request(appId:String, module: String, op: String, data: String, routing: Route)extends Model
 
   case class Result(status: Int, module: String, op: String, data: String, routing: Route) extends Model
 
@@ -199,8 +199,8 @@ object Max {
 
   case class SearchCategory(title:String, category:String, icon:String ) extends Model
 
-  case class SyncOpenGraph(uId:Long, appId:String) extends Model
-  case class GetCategories(uId:Long, appId:String) extends Model
+  case class SyncOpenGraph(uId:Long) extends Model
+  case class GetCategories(uId:Long) extends Model
 
   case class GetCardInfo(id:String, api:String, lat:Double, lng:Double) extends Model
   case class CardTab(tab:String, icon:String, content:String) extends Model

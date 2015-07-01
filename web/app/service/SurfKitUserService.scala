@@ -22,7 +22,7 @@ import scala.util.Try
 object ProfileImplicits {
   implicit def BasicProfile2ProviderProfile(u : BasicProfile):ProviderProfile =
     ProviderProfile(
-      0,0,"APPID",
+      0,0,"APPID?",
       u.providerId,
       u.userId,
       u.firstName,
@@ -100,7 +100,7 @@ class SurfKitUserService extends UserService[User] {
     if (logger.isDebugEnabled) {
       logger.debug("users = %s".format(users))
     }
-    WS.url(s"$surfkitEndpoint/auth/find").post( upickle.write(io.surfkit.model.Auth.FindUser("APPID",providerId,userId)) ).map{
+    WS.url(s"$surfkitEndpoint/auth/find").post( upickle.write(io.surfkit.model.Auth.FindUser(providerId,userId)) ).map{
       res =>
         println(s"ret json: ${res.json}")
         val apiRes = upickle.read[Api.Result](res.json.toString)

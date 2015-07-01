@@ -34,7 +34,8 @@ class WebSocketServer(val serverConnection: ActorRef, val route: Route) extends 
       val uid = request.uri.path.reverse.head.toString.toLong
       print("UID UID")
       print(s"UID $uid")
-      handler ! WebSocket.Open(uid, this)
+      val appId = "maxsearch"   // TODO: ... real app id
+      handler ! WebSocket.Open(appId, uid, this)
     case Rejected(rejections) =>
       log.info("Rejecting with {}", rejections)
       context stop self
