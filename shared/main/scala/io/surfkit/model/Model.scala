@@ -66,6 +66,7 @@ object Auth{
 
   case class FindUser(providerId:String, userId:String) extends Model
   case class GetProvider(uId:Long, provider:String)  extends Model
+  case class AuthUser(uid:Long, token:String)  extends Model
   case class GetFriends(userId:Long ) extends Model
   case class SaveResponse(userId: Long) extends Model
   case class OAuth1Info(token: String, secret: String) extends Model
@@ -198,12 +199,14 @@ object Max {
   case class SearchResultList(category: String, next:List[SearchNext], num:Int, pages:Int, results:List[SearchResult]) extends Model
 
   case class SearchCategory(title:String, category:String, icon:String ) extends Model
+  case class SearchCategoryList(categories:Seq[SearchCategory]) extends Model
 
   case class SyncOpenGraph(uId:Long) extends Model
   case class GetCategories(uId:Long) extends Model
 
-  case class GetCardInfo(id:String, api:String, lat:Double, lng:Double) extends Model
-  case class CardTab(tab:String, icon:String, content:String) extends Model
+  case class GetCardInfo(id:String, uri:String, api:String, lat:Double, lng:Double, destLat:Double, destLng:Double) extends Model
+  case class CardTab(tab:String, icon:String, resource:String, content:String) extends Model
+  case class CardTabList(tabs:Seq[CardTab]) extends Model
 
   case class Log(id:Long, userKey:Long, date:String, json:String) extends Model
 }

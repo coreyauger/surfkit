@@ -5,6 +5,7 @@ import java.util.{Date, UUID}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import core.common.NeoService
+import io.surfkit.modules.HangTenSlick.FlatProviderProfile
 import play.api.libs.json.{JsValue, JsObject, JsArray, Json}
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -37,8 +38,35 @@ trait UserGraph extends NeoService {
   implicit val profR = Json.reads[Auth.ProfileInfo]
   implicit val profW = Json.writes[Auth.ProfileInfo]
 
+  implicit val flatProR = Json.reads[FlatProviderProfile]
+
   //We provide xxxQ for the rest of the world so they can make transactions just by apppending Qs
 
+  val providerReturn =
+    """
+      |RETURN
+      |0 as id,
+      |u.uid as userKey,
+      |p.id as userId,
+      |p.name as appId,
+      |p.name as providerId,
+      |p.jid as jid,
+      |p.firstName as firstName,
+      |p.lastName as lastName,
+      |p.fullName as fullName,
+      |p.authMethod as authMethod,
+      |p.oAuth1InfoToken as OAuth1InfoToken,
+      |p.oAuth1InfoSecret as OAuth1InfoSecret,
+      |p.oAuth2InfoAccessToken as OAuth2InfoAccessToken,
+      |p.oAuth2InfoExpiresIn as OAuth2InfoExpiresIn,
+      |p.oAuth2InfoRefreshToken as OAuth2InfoRefreshToken,
+      |p.oAuth2InfoTokenType as OAuth2InfoTokenType,
+      |p.avatarUrl as avatarUrl,
+      |p.email as email,
+      |p.hasher as hasher,
+      |p.password as password,
+      |p.salt as salt;
+    """.stripMargin
 
   def getProfileInfo(userId: Long): Future[Seq[Auth.ProfileInfo]] = {
     Q(
@@ -88,24 +116,42 @@ trait UserGraph extends NeoService {
   def addFriend(uid: Long, friendId: Long) = ???
 
 
-  def getProvidersQ(uid: Long) = Q("MATCH (u:User)-[:MANAGES]->(:Profile)->[:HAS_ACCOUNT]->(p:Provider) WHERE u.uid = {uid} RETURN p").use("uid" -> uid)
+  def getProvidersQ(uid: Long) = Q("MATCH (u:User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(p:Provider) WHERE u.uid = {uid} RETURN p").use("uid" -> uid)
   def getProviders(uid: Long): Future[JsArray] = getProvidersQ(uid).getManyJs
 
+  def getProviderQ(uid:Long, providerId: String) =
+  Q(
+    s"""
+      |MATCH (u:User {uid:{uid}})-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(p:Provider {name:{providerId}})
+      |${providerReturn}
+    """.stripMargin
+  ).use("uid" -> uid, "providerId" -> providerId)
+  def getProvider(uid: Long, providerId:String): Future[Seq[FlatProviderProfile]] = getProviderQ(uid,providerId).getMany[FlatProviderProfile]
+
+
+  def getProviderFromTokenQ(uid:Long, token:String) =
+    Q(
+      s"""
+      |MATCH (u:User {uid:{uid}})-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(p:Provider {oAuth2InfoAccessToken:{token}})
+      |${providerReturn}
+    """.stripMargin
+    ).use("uid" -> uid, "token" -> token)
+  def getProviderFromToken(uid: Long, token:String): Future[Seq[FlatProviderProfile]] = getProviderFromTokenQ(uid,token).getMany[FlatProviderProfile]
 
   def mergeFriends(uid: Long, friends: Seq[JsObject], provider: String) = {
     println(s"PROPS: $friends, provider: $provider")
     Q("""
         MATCH (u: User)-[:MANAGES]->(:Profile)-[:HAS_ACCOUNT]->(pu:Provider)
-        WHERE u.uid = {uid} AND pu.name = {provider}
-        FOREACH (p in {props} |
-          MERGE (f:Provider {name: p.name, jid: p.jid, id: p.id})
-          ON CREATE
-            SET
-              f.fullName = p.fullName,
-              f.avatarUrl = p.avatarUrl,
-              f.email = ''
-          CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
-        RETURN u
+        |        WHERE u.uid = {uid} AND pu.name = {provider}
+        |        FOREACH (p in {props} |
+        |          MERGE (f:Provider {name: p.name, jid: p.jid, id: p.id})
+        |          ON CREATE
+        |            SET
+        |              f.fullName = p.fullName,
+        |              f.avatarUrl = p.avatarUrl,
+        |              f.email = ''
+        |          CREATE UNIQUE (pu)-[:FRIEND]->(f)-[:FRIEND]->(pu))
+        |        RETURN u
       """).use("uid" -> uid, "provider" -> provider, "props" -> friends).run()
     }
 

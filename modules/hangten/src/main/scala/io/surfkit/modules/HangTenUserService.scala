@@ -29,12 +29,23 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
             HangTenSlick.Implicits.FlatProviderToProvider(provider.head)
       }
 
-    case Auth.GetProvider(uId:Long, providerId: String) =>
-      logger.debug(s"Auth.GetProvider($uId, ${r.appId}, $providerId)")
-      HangTenSlick.getProviderForUser(uId, r.appId, providerId).map {
+    case Auth.AuthUser(uid:Long, token:String) =>
+      logger.debug(s"Auth.AuthUser($uid, ${r.appId}, $token)")
+      getProviderFromToken(uid, token).map{
         case provider: Seq[HangTenSlick.FlatProviderProfile] =>
           provider.headOption.map(HangTenSlick.Implicits.FlatProviderToProvider).getOrElse(Ack)
       }
+
+    case Auth.GetProvider(uId:Long, providerId: String) =>
+      logger.debug(s"Auth.GetProvider($uId, ${r.appId}, $providerId)")
+      getProvider(uId, providerId).map{
+        case provider: Seq[HangTenSlick.FlatProviderProfile] =>
+            provider.headOption.map(HangTenSlick.Implicits.FlatProviderToProvider).getOrElse(Ack)
+      }
+      //HangTenSlick.getProviderForUser(uId, r.appId, providerId).map {
+      //  case provider: Seq[HangTenSlick.FlatProviderProfile] =>
+      //    provider.headOption.map(HangTenSlick.Implicits.FlatProviderToProvider).getOrElse(Ack)
+      //}
 
     case p:Auth.ProviderProfile =>
       // this is a save or an update operation...
@@ -47,7 +58,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
           Future.successful(Auth.SaveResponse(pro.head.userKey))
       }.recoverWith {
         case _ =>
-          println("could not find.. running save..")
+          println("could not find.. doing a  save..")
           HangTenSlick.saveProvider(p).map{
             id =>
               saveUserGraph(id,p).onSuccess{
@@ -86,6 +97,7 @@ object HangTenUserService extends App with SurfKitModule with UserGraph {
     println("IN THE MAPPER ...")
     (r.op match {
       case "find" => actions(r)(upickle.read[Auth.FindUser](r.data.toString))
+      case "token" => actions(r)(upickle.read[Auth.AuthUser](r.data.toString))
       case "provider" => actions(r)(upickle.read[Auth.GetProvider](r.data.toString))
       case "save" => actions(r)(upickle.read[Auth.ProviderProfile](r.data.toString))
       case "friends" => actions(r)(upickle.read[Auth.GetFriends](r.data.toString))
